@@ -217,7 +217,7 @@ export const createService = async (
 
 export const updateService = async (id: number, service: Partial<Service>): Promise<Service> => {
   try {
-    const response = await apiClient.put<Service>(`/services/${id}/`, service);
+    const response = await apiClient.put<Service>(`/service/${id}/`, service);
     return response.data;
   } catch (error) {
     return handleError(error as AxiosError<ErrorResponse>);
