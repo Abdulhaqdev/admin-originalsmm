@@ -51,7 +51,6 @@ interface Api {
   id: number;
   name: string;
   url: string;
-  percentage: string;
   exchange: {
     id: number;
     name: string;
@@ -78,6 +77,7 @@ interface Service {
   min: number;
   max: number;
   price: number;
+  percentage: string;
   site_id: number;
   category: number;
   api: number;
@@ -94,6 +94,7 @@ interface FormErrors {
   description_ru?: string;
   description_en?: string;
   price?: string;
+  percentage?: string;
   duration?: string;
   min?: string;
   max?: string;
@@ -121,7 +122,6 @@ export default function ServicePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
   const itemsPerPage = 4;
@@ -137,6 +137,7 @@ export default function ServicePage() {
     min: 0,
     max: 0,
     price: 0,
+    percentage: "50",
     site_id: 0,
     category: 0,
     api: 0,
@@ -149,7 +150,6 @@ export default function ServicePage() {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [editFormErrors, setEditFormErrors] = useState<FormErrors>({});
 
-  // Filters
   const [filterCategory, setFilterCategory] = useState<number | "all">("all");
   const [filterActive, setFilterActive] = useState<boolean | "all">("all");
   const [filterPriceMin, setFilterPriceMin] = useState<number | "">("");
@@ -158,14 +158,13 @@ export default function ServicePage() {
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filterApiId, setFilterApiId] = useState<number | "all">("all");
 
-  // API’dan ma'lumotlarni olish
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         const offset = (currentPage - 1) * itemsPerPage;
         const [categoriesData, servicesData, apisData] = await Promise.all([
-          getCategories(100, 0), // Fetch all categories (adjust limit as needed)
+          getCategories(100, 0),
           getServices(itemsPerPage, offset),
           getApis(),
         ]);
@@ -181,6 +180,7 @@ export default function ServicePage() {
           description_uz: svc.description_uz ?? "",
           description_ru: svc.description_ru ?? "",
           description_en: svc.description_en ?? "",
+          percentage: svc.percentage ?? "50",
         }));
         setCategories(normalizedCategories);
         setServices(normalizedServices);
@@ -202,7 +202,6 @@ export default function ServicePage() {
     fetchData();
   }, [currentPage]);
 
-  // Validate min/max for new service
   useEffect(() => {
     if (newService.min > newService.max && newService.max !== 0) {
       setFormErrors((prev) => ({
@@ -218,7 +217,6 @@ export default function ServicePage() {
     }
   }, [newService.min, newService.max]);
 
-  // Validate min/max for edit service
   useEffect(() => {
     if (!editService) return;
     if (editService.min > editService.max && editService.max !== 0) {
@@ -244,7 +242,6 @@ export default function ServicePage() {
     }
   };
 
-  // Apply all filters
   const filteredServices = services.filter((service) => {
     if (filterCategory !== "all" && service.category !== filterCategory) {
       return false;
@@ -276,6 +273,11 @@ export default function ServicePage() {
     }
     if (sortField === "duration") {
       return sortDirection === "asc" ? a.duration - b.duration : b.duration - a.duration;
+    }
+    if (sortField === "percentage") {
+      return sortDirection === "asc" 
+        ? parseFloat(a.percentage) - parseFloat(b.percentage) 
+        : parseFloat(b.percentage) - parseFloat(a.percentage);
     }
     const aField = a[sortField] ?? "";
     const bField = b[sortField] ?? "";
@@ -310,6 +312,9 @@ export default function ServicePage() {
     if (!newService.description_en) errors.description_en = "Description (English) is required";
     if (newService.price === undefined || newService.price === null || isNaN(newService.price))
       errors.price = "Price is required";
+    if (!newService.percentage) errors.percentage = "Percentage is required";
+    else if (parseFloat(newService.percentage) < 0 || parseFloat(newService.percentage) > 100)
+      errors.percentage = "Percentage must be between 0 and 100";
     if (newService.duration === 0) errors.duration = "Duration is required";
     if (!newService.min) errors.min = "Min quantity is required";
     if (!newService.max) errors.max = "Max quantity is required";
@@ -331,6 +336,9 @@ export default function ServicePage() {
     if (!editService.description_en) errors.description_en = "Description (English) is required";
     if (editService.price === undefined || editService.price === null || isNaN(editService.price))
       errors.price = "Price is required";
+    if (!editService.percentage) errors.percentage = "Percentage is required";
+    else if (parseFloat(editService.percentage) < 0 || parseFloat(editService.percentage) > 100)
+      errors.percentage = "Percentage must be between 0 and 100";
     if (editService.duration === 0) errors.duration = "Duration is required";
     if (!editService.min) errors.min = "Min quantity is required";
     if (!editService.max) errors.max = "Max quantity is required";
@@ -351,6 +359,7 @@ export default function ServicePage() {
         description_uz: createdService.description_uz ?? "",
         description_ru: createdService.description_ru ?? "",
         description_en: createdService.description_en ?? "",
+        percentage: createdService.percentage ?? "50",
       }]);
       setNewService({
         name_uz: "",
@@ -363,6 +372,7 @@ export default function ServicePage() {
         min: 0,
         max: 0,
         price: 0,
+        percentage: "50",
         site_id: 0,
         category: categories[0]?.id || 0,
         api: apis[0]?.id || 0,
@@ -372,7 +382,7 @@ export default function ServicePage() {
       setAddDialogOpen(false);
       setCurrentPage(1);
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmat qo‘shishda xato yuz berdi");
+      setError((err as { message?: string }).message || "Xizmat qo'shishda xato yuz berdi");
     }
   }, [newService, categories, apis, validateForm]);
 
@@ -387,6 +397,7 @@ export default function ServicePage() {
           description_uz: updatedService.description_uz ?? "",
           description_ru: updatedService.description_ru ?? "",
           description_en: updatedService.description_en ?? "",
+          percentage: updatedService.percentage ?? "50",
         } : service)),
       );
       setEditService(null);
@@ -408,7 +419,7 @@ export default function ServicePage() {
         setCurrentPage((prev) => prev - 1);
       }
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmat o‘chirishda xato yuz berdi");
+      setError((err as { message?: string }).message || "Xizmat o'chirishda xato yuz berdi");
     }
   };
 
@@ -583,6 +594,13 @@ export default function ServicePage() {
                         (sortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
                     </div>
                   </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort("percentage")}>
+                    <div className="flex items-center gap-1">
+                      Percentage
+                      {sortField === "percentage" &&
+                        (sortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
+                    </div>
+                  </TableHead>
                   <TableHead>Min-Max</TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort("duration")}>
                     <div className="flex items-center gap-1">
@@ -614,6 +632,7 @@ export default function ServicePage() {
                     <TableCell className="font-medium">{service.name_en}</TableCell>
                     <TableCell>{getCategoryName(service.category)}</TableCell>
                     <TableCell>${service.price}</TableCell>
+                    <TableCell>{service.percentage}%</TableCell>
                     <TableCell>{`${service.min}-${service.max}`}</TableCell>
                     <TableCell>{formatDuration(service.duration)}</TableCell>
                     <TableCell>{getApiName(service.api)}</TableCell>
@@ -655,7 +674,7 @@ export default function ServicePage() {
                 ))}
                 {sortedServices.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No services found. Try adjusting your filters or add a new service.
                     </TableCell>
                   </TableRow>
@@ -802,7 +821,7 @@ export default function ServicePage() {
               <Input
                 type="number"
                 placeholder="Min"
-//  periphery: {filterPriceMin}
+                value={filterPriceMin}
                 onChange={(e) => setFilterPriceMin(e.target.value ? Number.parseFloat(e.target.value) : "")}
               />
               <span>to</span>
@@ -1010,18 +1029,34 @@ export default function ServicePage() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="site-id">
-                Site ID<span className="text-destructive ml-1">*</span>
+              <Label htmlFor="percentage">
+                Percentage (%)<span className="text-destructive ml-1">*</span>
               </Label>
               <Input
-                id="site-id"
+                id="percentage"
                 type="number"
-                value={newService.site_id}
-                onChange={(e) => setNewService({ ...newService, site_id: Number.parseInt(e.target.value) || 0 })}
+                min="0"
+                max="100"
+                value={newService.percentage}
+                onChange={(e) => setNewService({ ...newService, percentage: e.target.value })}
                 required
               />
-              {formErrors.site_id && <FormMessage>{formErrors.site_id}</FormMessage>}
+              {formErrors.percentage && <FormMessage>{formErrors.percentage}</FormMessage>}
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="site-id">
+              Site ID<span className="text-destructive ml-1">*</span>
+            </Label>
+            <Input
+              id="site-id"
+              type="number"
+              value={newService.site_id}
+              onChange={(e) => setNewService({ ...newService, site_id: Number.parseInt(e.target.value) || 0 })}
+              required
+            />
+            {formErrors.site_id && <FormMessage>{formErrors.site_id}</FormMessage>}
           </div>
 
           <div className="grid gap-2">
@@ -1228,18 +1263,34 @@ export default function ServicePage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="edit-site-id">
-                  Site ID<span className="text-destructive ml-1">*</span>
+                <Label htmlFor="edit-percentage">
+                  Percentage (%)<span className="text-destructive ml-1">*</span>
                 </Label>
                 <Input
-                  id="edit-site-id"
+                  id="edit-percentage"
                   type="number"
-                  value={editService.site_id}
-                  onChange={(e) => setEditService({ ...editService, site_id: Number.parseInt(e.target.value) || 0 })}
+                  min="0"
+                  max="100"
+                  value={editService.percentage}
+                  onChange={(e) => setEditService({ ...editService, percentage: e.target.value })}
                   required
                 />
-                {editFormErrors.site_id && <FormMessage>{editFormErrors.site_id}</FormMessage>}
+                {editFormErrors.percentage && <FormMessage>{editFormErrors.percentage}</FormMessage>}
               </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="edit-site-id">
+                Site ID<span className="text-destructive ml-1">*</span>
+              </Label>
+              <Input
+                id="edit-site-id"
+                type="number"
+                value={editService.site_id}
+                onChange={(e) => setEditService({ ...editService, site_id: Number.parseInt(e.target.value) || 0 })}
+                required
+              />
+              {editFormErrors.site_id && <FormMessage>{editFormErrors.site_id}</FormMessage>}
             </div>
 
             <div className="grid gap-2">

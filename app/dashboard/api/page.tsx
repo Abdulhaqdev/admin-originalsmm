@@ -49,7 +49,7 @@ import {
 interface Exchange {
   id: number;
   name: string;
-  price: string; // Yangi qo‘shildi
+  price: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -64,7 +64,6 @@ interface Api {
   id: number;
   name: string;
   url: string;
-  percentage: string;
   exchange: {
     id: number;
     name: string;
@@ -100,7 +99,6 @@ export default function ApiPage() {
   const [currentApiPage, setCurrentApiPage] = useState<number>(1);
   const [totalApiCount, setTotalApiCount] = useState<number>(0);
   const itemsPerPage = 10;
-  
 
   // Pagination states for Exchanges
   const [currentExchangePage, setCurrentExchangePage] = useState<number>(1);
@@ -140,7 +138,6 @@ export default function ApiPage() {
   const [newApi, setNewApi] = useState<Omit<Api, "id" | "created_at" | "updated_at" | "last_used" | "error_logs">>({
     name: "",
     url: "",
-    percentage: "50",
     exchange_id: 1,
     is_active: true,
     key: "",
@@ -149,7 +146,7 @@ export default function ApiPage() {
 
   const [newExchange, setNewExchange] = useState<Omit<Exchange, "id" | "created_at" | "updated_at">>({
     name: "",
-    price: "", // Yangi qo‘shildi
+    price: "",
     is_active: true,
   });
 
@@ -157,13 +154,12 @@ export default function ApiPage() {
   const [apiFormErrors, setApiFormErrors] = useState<{
     url?: string;
     name?: string;
-    percentage?: string;
     key?: string;
   }>({});
 
   const [exchangeFormErrors, setExchangeFormErrors] = useState<{
     name?: string;
-    price?: string; // Yangi qo‘shildi
+    price?: string;
   }>({});
 
   // API'dan ma'lumotlarni yuklash
@@ -222,11 +218,6 @@ export default function ApiPage() {
     const aValue = a[apiSortField];
     const bValue = b[apiSortField];
 
-    if (apiSortField === "percentage") {
-      return apiSortDirection === "asc"
-        ? parseFloat(aValue as string) - parseFloat(bValue as string)
-        : parseFloat(bValue as string) - parseFloat(aValue as string);
-    }
     if (apiSortField === "is_active") {
       return apiSortDirection === "asc"
         ? Number(aValue) - Number(bValue)
@@ -324,9 +315,6 @@ export default function ApiPage() {
     if (!data.name) errors.name = "Name is required";
     if (!data.url) errors.url = "URL is required";
     else if (!/^https?:\/\//.test(data.url)) errors.url = "URL must be valid (start with http:// or https://)";
-    if (!data.percentage) errors.percentage = "Percentage is required";
-    else if (parseFloat(data.percentage) < 0 || parseFloat(data.percentage) > 100)
-      errors.percentage = "Percentage must be between 0 and 100";
     if (!data.key) errors.key = "API key is required";
     setApiFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -351,7 +339,6 @@ export default function ApiPage() {
       setNewApi({
         name: "",
         url: "",
-        percentage: "50",
         exchange_id: exchanges[0]?.id || 1,
         is_active: true,
         key: "",
@@ -633,13 +620,6 @@ export default function ApiPage() {
                             (apiSortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
                         </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleApiSort("percentage")}>
-                        <div className="flex items-center gap-1">
-                          Percentage
-                          {apiSortField === "percentage" &&
-                            (apiSortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
-                        </div>
-                      </TableHead>
                       <TableHead className="cursor-pointer" onClick={() => handleApiSort("is_active")}>
                         <div className="flex items-center gap-1">
                           Active
@@ -670,7 +650,6 @@ export default function ApiPage() {
                           <TableCell className="font-medium">{api.name}</TableCell>
                           <TableCell>{api.url}</TableCell>
                           <TableCell>{getExchangeName(api.exchange_id)}</TableCell>
-                          <TableCell>{api.percentage}%</TableCell>
                           <TableCell>
                             <div className="flex items-center">
                               {api.is_active ? (
@@ -726,7 +705,7 @@ export default function ApiPage() {
                         </TableRow>
                         {expandedApiLogs.includes(api.id) && (
                           <TableRow>
-                            <TableCell colSpan={8} className="bg-muted/30">
+                            <TableCell colSpan={7} className="bg-muted/30">
                               <div className="p-2">
                                 <h4 className="font-medium mb-2">API Usage Logs</h4>
                                 {api.error_logs && api.error_logs.length > 0 ? (
@@ -750,7 +729,7 @@ export default function ApiPage() {
                     ))}
                     {sortedApis.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No APIs found. Try adjusting your filters or add a new API.
                         </TableCell>
                       </TableRow>
@@ -1124,24 +1103,6 @@ export default function ApiPage() {
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="percentage">
-              Percentage<span className="text-destructive ml-1">*</span>
-            </Label>
-            <Input
-              id="percentage"
-              type="number"
-              min="0"
-              max="100"
-              value={editingApi ? editingApi.percentage : newApi.percentage}
-              onChange={(e) =>
-                editingApi
-                  ? setEditingApi({ ...editingApi, percentage: e.target.value })
-                  : setNewApi({ ...newApi, percentage: e.target.value })
-              }
-            />
-            {apiFormErrors.percentage && <p className="text-sm text-destructive">{apiFormErrors.percentage}</p>}
-          </div>
-          <div className="grid gap-2">
             <Label htmlFor="key">
               API Key<span className="text-destructive ml-1">*</span>
             </Label>
@@ -1240,70 +1201,52 @@ export default function ApiPage() {
 
       {/* Delete API Confirmation Dialog */}
       <Modal
-      children={null}
-
         open={deleteApiDialogOpen}
         onOpenChange={setDeleteApiDialogOpen}
         title="Delete API"
         description="Are you sure you want to delete this API? This action cannot be undone."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteApiDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteApi}>
-              Delete
-            </Button>
-          </>
-        }
-      />
+        footer={<>
+          <Button variant="outline" onClick={() => setDeleteApiDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteApi}>
+            Delete
+          </Button>
+        </>} children={undefined}      />
 
       {/* Delete Exchange Confirmation Dialog */}
       <Modal
-      children={null}
         open={deleteExchangeDialogOpen}
         onOpenChange={setDeleteExchangeDialogOpen}
         title="Delete Exchange"
         description="Are you sure you want to delete this exchange? This action cannot be undone."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteExchangeDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteExchange}>
-              Delete
-            </Button>
-          </>
-        }
-      />
+        footer={<>
+          <Button variant="outline" onClick={() => setDeleteExchangeDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteExchange}>
+            Delete
+          </Button>
+        </>} children={undefined}      />
 
       {/* Bulk Action Confirmation Dialog */}
       <Modal
-      children={null}
-
         open={bulkActionDialogOpen}
         onOpenChange={setBulkActionDialogOpen}
-        title={
-          bulkAction === "delete" ? "Delete APIs" : bulkAction === "activate" ? "Activate APIs" : "Deactivate APIs"
-        }
-        description={
-          bulkAction === "delete"
-            ? `Are you sure you want to delete ${selectedApis.length} APIs? This action cannot be undone.`
-            : bulkAction === "activate"
+        title={bulkAction === "delete" ? "Delete APIs" : bulkAction === "activate" ? "Activate APIs" : "Deactivate APIs"}
+        description={bulkAction === "delete"
+          ? `Are you sure you want to delete ${selectedApis.length} APIs? This action cannot be undone.`
+          : bulkAction === "activate"
             ? `Are you sure you want to activate ${selectedApis.length} APIs?`
-            : `Are you sure you want to deactivate ${selectedApis.length} APIs?`
-        }
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setBulkActionDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant={bulkAction === "delete" ? "destructive" : "default"} onClick={handleBulkAction}>
-              {bulkAction === "delete" ? "Delete" : bulkAction === "activate" ? "Activate" : "Deactivate"}
-            </Button>
-          </>
-        }
-      />
+            : `Are you sure you want to deactivate ${selectedApis.length} APIs?`}
+        footer={<>
+          <Button variant="outline" onClick={() => setBulkActionDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant={bulkAction === "delete" ? "destructive" : "default"} onClick={handleBulkAction}>
+            {bulkAction === "delete" ? "Delete" : bulkAction === "activate" ? "Activate" : "Deactivate"}
+          </Button>
+        </>} children={undefined}      />
     </div>
   );
 }
