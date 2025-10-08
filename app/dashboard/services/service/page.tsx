@@ -9,6 +9,7 @@ import {
   ChevronUp,
   Filter,
   Search,
+  Link,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +34,7 @@ import { DurationInput } from "@/components/ui/duration-input";
 import { FormMessage } from "@/components/ui/form";
 import { getCategories, getServices, createService, updateService, deleteService, getApis } from "@/lib/apiservice";
 
-interface Category {
+export interface Category {
   id: number;
   name_uz: string;
   name_ru: string;
@@ -47,7 +48,7 @@ interface Category {
   icon?: string;
 }
 
-interface Api {
+ export interface Api {
   id: number;
   name: string;
   url: string;
@@ -484,11 +485,17 @@ export default function ServicePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Services</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button onClick={() => setAddDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Service
           </Button>
+          {/* <Link href="https://originalsmm.uz/admin/services/" > */}
+          <Button variant="outline">
+            {/* <Plus className="mr-2 h-4 w-4" /> */}
+            Add Multi services
+          </Button>
+          {/* </Link> */}
         </div>
       </div>
 
