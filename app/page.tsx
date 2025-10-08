@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from '@/lib/apiservice'
-// import { login } from '@/lib/apiService'
 
 interface Feature {
   title: string;
@@ -23,37 +22,35 @@ export default function LandingPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
 
-const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
-  try {
-    const credentials = { username, password };
-    const data = await login(credentials);
-   
+    try {
+      const credentials = { username, password };
+      const data = await login(credentials);
+      
+      // Store tokens in localStorage
+      localStorage.setItem("access_token", data.access);
+      localStorage.setItem("refresh_token", data.refresh);
+      localStorage.setItem("user_id", data.user_id.toString());
+      localStorage.setItem("access_token_expiry", (Date.now() + 3600 * 1000).toString()); // 1 hour expiry
 
-    // Store tokens in localStorage
-    localStorage.setItem("access_token", data.access);
-    localStorage.setItem("refresh_token", data.refresh);
-    localStorage.setItem("user_id", data.user_id.toString());
-    localStorage.setItem("access_token_expiry", (Date.now() + 3600 * 1000).toString()); // 1 hour expiry
-
-
-
-    if (data.admin) {
-     router.push("/dashboard");
-    } else {
-      setError("Faqat admin foydalanuvchilar kira oladi!");
+      if (data.admin) {
+        // Store token in cookie for middleware validation
+        document.cookie = `access_token=${data.access}; path=/; max-age=3600; secure; samesite=strict`;
+        router.push("/dashboard");
+      } else {
+        setError("Faqat admin foydalanuvchilar kira oladi!");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError((err as { message?: string }).message || "Login yoki parol xato!");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Login error:", err);
-    setError((err as { message?: string }).message || "Login yoki parol xato!");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   return (
     <div className="flex min-h-screen flex-col">

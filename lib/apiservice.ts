@@ -226,7 +226,7 @@ export const updateService = async (id: number, service: Partial<Service>): Prom
 
 export const deleteService = async (id: number): Promise<void> => {
   try {
-    await apiClient.delete(`/services/${id}/`);
+    await apiClient.delete(`/service/${id}/`);
   } catch (error) {
     return handleError(error as AxiosError<ErrorResponse>);
   }
