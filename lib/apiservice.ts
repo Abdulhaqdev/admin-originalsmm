@@ -43,7 +43,7 @@ const getCookie = (name: string): string | null => {
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token")
+    const token = localStorage.getItem("access_token");
     console.log(`Request to ${config.url} - Using token: ${token || "none"}`);
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -527,3 +527,38 @@ interface ErrorResponse {
   message?: string;
   detail?: string;
 }
+
+// -------------------- SERVICE INFO BY SERVICE -------------------- //
+interface ServiceInfo {
+  name: string;
+  min_quantity: number;
+  max_quantity: number;
+  price: number;
+  percentage: string;
+}
+
+export const getInfoByService = async (site_id: number, api_id: number): Promise<ServiceInfo> => {
+  try {
+    const response = await axios.get(`https://api.originalsmm.uz/api/get_info_by_service/${site_id}/${api_id}`, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.data) {
+      throw new Error("No data returned from the API");
+    }
+
+    const data = response.data;
+    return {
+      name: data.name || "",
+      min_quantity: data.min || 0,
+      max_quantity: data.max || 0,
+      price: data.price ? data.price / 1000 : 0, // Convert price from cents to dollars
+      percentage: data.percentage || "50", // Default percentage if not provided
+    };
+  } catch (error) {
+    console.error("getInfoByService error:", error);
+    return handleError(error as AxiosError<ErrorResponse>);
+  }
+};
