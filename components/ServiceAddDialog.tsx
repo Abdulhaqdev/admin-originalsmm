@@ -282,7 +282,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
             value={newService.name_en}
             onChange={(e) => setNewService({ ...newService, name_en: e.target.value })}
             required
-            disabled={isApiFetched} // Disable if API data is fetched
           />
           {formErrors.name_en && <FormMessage>{formErrors.name_en}</FormMessage>}
         </div>
@@ -387,7 +386,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
               onChange={(e) => handleNumberInputChange(e, "min")}
               onBlur={(e) => handleNumberInputBlur(e, "min")}
               required
-              disabled={isApiFetched}
             />
             {formErrors.min && <FormMessage>{formErrors.min}</FormMessage>}
           </div>
@@ -403,7 +401,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
               onChange={(e) => handleNumberInputChange(e, "max")}
               onBlur={(e) => handleNumberInputBlur(e, "max")}
               required
-              disabled={isApiFetched}
             />
             {formErrors.max && <FormMessage>{formErrors.max}</FormMessage>}
           </div>
@@ -423,7 +420,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
               onChange={(e) => handleNumberInputChange(e, "price")}
               onBlur={(e) => handleNumberInputBlur(e, "price")}
               required
-              disabled={isApiFetched}
             />
             {formErrors.price && <FormMessage>{formErrors.price}</FormMessage>}
           </div>
@@ -441,7 +437,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
               onChange={(e) => handleNumberInputChange(e, "percentage")}
               onBlur={(e) => handleNumberInputBlur(e, "percentage")}
               required
-              disabled={isApiFetched}
             />
             {formErrors.percentage && <FormMessage>{formErrors.percentage}</FormMessage>}
           </div>

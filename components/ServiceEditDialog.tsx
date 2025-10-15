@@ -32,9 +32,11 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
   const [editFormErrors, setEditFormErrors] = useState<FormErrors>({});
   const [fetchingServiceInfo, setFetchingServiceInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isApiFetched, setIsApiFetched] = useState<boolean>(false); // Track if API data has been fetched
 
   useEffect(() => {
     setEditService(service);
+    setIsApiFetched(false); // Reset API fetch state when service changes
   }, [service]);
 
   useEffect(() => {
@@ -42,8 +44,8 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     if (editService.min > editService.max && editService.max !== 0) {
       setEditFormErrors((prev) => ({
         ...prev,
-        min: "Min must be less than max",
-        max: "Max must be greater than min",
+        min: "Min must be less than or equal to max",
+        max: "Max must be greater than or equal to min",
       }));
     } else if (editFormErrors.min || editFormErrors.max) {
       setEditFormErrors((prev) => {
@@ -51,7 +53,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
         return rest;
       });
     }
-  }, [editService?.min, editService?.max, editFormErrors.min, editFormErrors.max]);
+  }, [editService?.min, editService?.max]);
 
   const validateEditForm = useCallback(() => {
     if (!editService) return false;
@@ -67,8 +69,10 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     if (!editService.percentage) errors.percentage = "Percentage is required";
     else if (parseFloat(editService.percentage) < 0 || parseFloat(editService.percentage) > 100)
       errors.percentage = "Percentage must be between 0 and 100";
-    if (!editService.min) errors.min = "Min quantity is required or invalid";
-    if (!editService.max) errors.max = "Max quantity is required or invalid";
+    if (editService.min === undefined || editService.min === null || editService.min < 0)
+      errors.min = "Min quantity must be 0 or greater";
+    if (editService.max === undefined || editService.max === null || editService.max < 0)
+      errors.max = "Max quantity must be 0 or greater";
     if (!editService.site_id) errors.site_id = "Site ID is required";
     if (!editService.api) errors.api = "API is required";
     if (!editService.category) errors.category = "Category is required";
@@ -85,6 +89,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
       if (editService.site_id && api_id) {
         try {
           setFetchingServiceInfo(true);
+          setIsApiFetched(true); // Mark API data as fetched
           const serviceInfo = await getInfoByService(editService.site_id, api_id);
           setEditService((prev) => prev && ({
             ...prev,
@@ -100,9 +105,48 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           });
         } catch (err) {
           setError((err as { message?: string }).message || "Failed to fetch service info");
+          setIsApiFetched(false); // Reset if fetch fails
         } finally {
           setFetchingServiceInfo(false);
         }
+      } else {
+        setIsApiFetched(false); // Reset if no valid site_id or api_id
+      }
+    },
+    [editService],
+  );
+
+  const handleSiteIdChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!editService) return;
+      const site_id = Number.parseInt(e.target.value) || 0;
+      setEditService((prev) => prev && ({ ...prev, site_id }));
+
+      if (editService.api && site_id) {
+        try {
+          setFetchingServiceInfo(true);
+          setIsApiFetched(true); // Mark API data as fetched
+          const serviceInfo = await getInfoByService(site_id, editService.api);
+          setEditService((prev) => prev && ({
+            ...prev,
+            name_en: serviceInfo.name,
+            min: serviceInfo.min_quantity,
+            max: serviceInfo.max_quantity,
+            price: serviceInfo.price,
+            percentage: serviceInfo.percentage,
+          }));
+          setEditFormErrors((prev) => {
+            const { min, max, price, percentage, name_en, ...rest } = prev;
+            return rest;
+          });
+        } catch (err) {
+          setError((err as { message?: string }).message || "Failed to fetch service info");
+          setIsApiFetched(false); // Reset if fetch fails
+        } finally {
+          setFetchingServiceInfo(false);
+        }
+      } else {
+        setIsApiFetched(false); // Reset if no valid site_id or api_id
       }
     },
     [editService],
@@ -113,9 +157,35 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     try {
       await onUpdateService(editService);
       setEditFormErrors({});
+      setError(null);
+      setIsApiFetched(false);
       onOpenChange(false);
     } catch (err) {
       setError((err as { message?: string }).message || "Xizmat yangilashda xato yuz berdi");
+    }
+  };
+
+  // Handle number input changes to prevent clearing 0
+  const handleNumberInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: keyof Service,
+  ) => {
+    if (!editService) return;
+    const value = e.target.value;
+    setEditService((prev) => prev && ({
+      ...prev,
+      [field]: value === "" ? 0 : field === "percentage" ? value : Number.parseFloat(value) || 0,
+    }));
+  };
+
+  // Handle blur to ensure 0 is set if input is empty
+  const handleNumberInputBlur = (
+    e: React.FocusEvent<HTMLInputElement>,
+    field: keyof Service,
+  ) => {
+    if (!editService) return;
+    if (e.target.value === "") {
+      setEditService((prev) => prev && ({ ...prev, [field]: 0 }));
     }
   };
 
@@ -197,6 +267,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             value={editService.name_en}
             onChange={(e) => setEditService({ ...editService, name_en: e.target.value })}
             required
+            disabled={isApiFetched}
           />
           {editFormErrors.name_en && <FormMessage>{editFormErrors.name_en}</FormMessage>}
         </div>
@@ -255,35 +326,11 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           <Input
             id="edit-site-id"
             type="number"
-            value={editService.site_id}
-            onChange={async (e) => {
-              const site_id = Number.parseInt(e.target.value) || 0;
-              setEditService({ ...editService, site_id });
-              if (editService.api && site_id) {
-                try {
-                  setFetchingServiceInfo(true);
-                  const serviceInfo = await getInfoByService(site_id, editService.api);
-                  setEditService((prev) => prev && ({
-                    ...prev,
-                    name_en: serviceInfo.name,
-                    min: serviceInfo.min_quantity,
-                    max: serviceInfo.max_quantity,
-                    price: serviceInfo.price,
-                    percentage: serviceInfo.percentage,
-                  }));
-                  setEditFormErrors((prev) => {
-                    const { min, max, price, percentage, name_en, ...rest } = prev;
-                    return rest;
-                  });
-                } catch (err) {
-                  setError((err as { message?: string }).message || "Failed to fetch service info");
-                } finally {
-                  setFetchingServiceInfo(false);
-                }
-              }
-            }}
+            min="0"
+            value={editService.site_id === 0 ? "" : editService.site_id}
+            onChange={handleSiteIdChange}
+            onBlur={(e) => handleNumberInputBlur(e, "site_id")}
             required
-            disabled={fetchingServiceInfo}
           />
           {editFormErrors.site_id && <FormMessage>{editFormErrors.site_id}</FormMessage>}
         </div>
@@ -319,8 +366,10 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             <Input
               id="edit-min"
               type="number"
-              value={editService.min}
-              onChange={(e) => setEditService({ ...editService, min: Number.parseInt(e.target.value) || 0 })}
+              min="0"
+              value={editService.min === 0 ? "" : editService.min}
+              onChange={(e) => handleNumberInputChange(e, "min")}
+              onBlur={(e) => handleNumberInputBlur(e, "min")}
               required
             />
             {editFormErrors.min && <FormMessage>{editFormErrors.min}</FormMessage>}
@@ -332,8 +381,10 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             <Input
               id="edit-max"
               type="number"
-              value={editService.max}
-              onChange={(e) => setEditService({ ...editService, max: Number.parseInt(e.target.value) || 0 })}
+              min="0"
+              value={editService.max === 0 ? "" : editService.max}
+              onChange={(e) => handleNumberInputChange(e, "max")}
+              onBlur={(e) => handleNumberInputBlur(e, "max")}
               required
             />
             {editFormErrors.max && <FormMessage>{editFormErrors.max}</FormMessage>}
@@ -348,9 +399,11 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             <Input
               id="edit-price"
               type="number"
+              min="0"
               step="0.01"
-              value={editService.price}
-              onChange={(e) => setEditService({ ...editService, price: Number.parseFloat(e.target.value) || 0 })}
+              value={editService.price === 0 ? "" : editService.price}
+              onChange={(e) => handleNumberInputChange(e, "price")}
+              onBlur={(e) => handleNumberInputBlur(e, "price")}
               required
             />
             {editFormErrors.price && <FormMessage>{editFormErrors.price}</FormMessage>}
@@ -365,8 +418,9 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
               type="number"
               min="0"
               max="100"
-              value={editService.percentage}
-              onChange={(e) => setEditService({ ...editService, percentage: e.target.value })}
+              value={editService.percentage === "0" ? "" : editService.percentage}
+              onChange={(e) => handleNumberInputChange(e, "percentage")}
+              onBlur={(e) => handleNumberInputBlur(e, "percentage")}
               required
             />
             {editFormErrors.percentage && <FormMessage>{editFormErrors.percentage}</FormMessage>}
