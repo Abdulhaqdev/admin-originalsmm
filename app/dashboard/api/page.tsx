@@ -155,6 +155,7 @@ export default function ApiPage() {
     url?: string;
     name?: string;
     key?: string;
+    exchange_id?: string;
   }>({});
 
   const [exchangeFormErrors, setExchangeFormErrors] = useState<{
@@ -310,12 +311,15 @@ export default function ApiPage() {
   };
 
   // Validate API form
-  const validateApiForm = (data: typeof newApi) => {
+  const validateApiForm = (data: typeof newApi | Api) => {
     const errors: typeof apiFormErrors = {};
     if (!data.name) errors.name = "Name is required";
     if (!data.url) errors.url = "URL is required";
     else if (!/^https?:\/\//.test(data.url)) errors.url = "URL must be valid (start with http:// or https://)";
     if (!data.key) errors.key = "API key is required";
+    if (!data.exchange_id || !exchanges.some((ex) => ex.id === data.exchange_id)) {
+      errors.exchange_id = "Exchange is required";
+    }
     setApiFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -346,8 +350,15 @@ export default function ApiPage() {
       });
       setApiFormOpen(false);
       toast({ title: "API Created", description: "The API has been created successfully." });
-    } catch (err) {
-      setError((err as { message?: string }).message || "API qo‘shishda xato yuz berdi");
+    } catch (err: any) {
+      if (err?.response?.data?.exchange_id) {
+        setApiFormErrors((prev) => ({
+          ...prev,
+          exchange_id: err.response.data.exchange_id[0] || "Exchange is required",
+        }));
+      } else {
+        setError((err as { message?: string }).message || "API qo‘shishda xato yuz berdi");
+      }
     }
   };
 
@@ -359,8 +370,15 @@ export default function ApiPage() {
       setEditingApi(null);
       setApiFormOpen(false);
       toast({ title: "API Updated", description: "The API has been updated successfully." });
-    } catch (err) {
-      setError((err as { message?: string }).message || "API yangilashda xato yuz berdi");
+    } catch (err: any) {
+      if (err?.response?.data?.exchange_id) {
+        setApiFormErrors((prev) => ({
+          ...prev,
+          exchange_id: err.response.data.exchange_id[0] || "Exchange is required",
+        }));
+      } else {
+        setError((err as { message?: string }).message || "API yangilashda xato yuz berdi");
+      }
     }
   };
 
@@ -1029,7 +1047,7 @@ export default function ApiPage() {
       </Modal>
 
       {/* API Form Modal */}
-      <Modal
+       <Modal
         open={apiFormOpen}
         onOpenChange={setApiFormOpen}
         title={editingApi ? "Edit API" : "Add API"}
@@ -1052,6 +1070,7 @@ export default function ApiPage() {
             </Label>
             <Input
               id="name"
+              required
               value={editingApi ? editingApi.name : newApi.name}
               onChange={(e) =>
                 editingApi
@@ -1068,6 +1087,7 @@ export default function ApiPage() {
             </Label>
             <Input
               id="url"
+              required
               value={editingApi ? editingApi.url : newApi.url}
               onChange={(e) =>
                 editingApi
@@ -1083,6 +1103,7 @@ export default function ApiPage() {
               Exchange<span className="text-destructive ml-1">*</span>
             </Label>
             <Select
+              required
               value={String(editingApi ? editingApi.exchange_id : newApi.exchange_id ?? "")}
               onValueChange={(value) =>
                 editingApi
@@ -1101,6 +1122,9 @@ export default function ApiPage() {
                 ))}
               </SelectContent>
             </Select>
+            {apiFormErrors.exchange_id && (
+              <p className="text-sm text-destructive">{apiFormErrors.exchange_id}</p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="key">
@@ -1108,6 +1132,7 @@ export default function ApiPage() {
             </Label>
             <Input
               id="key"
+              required
               value={editingApi ? editingApi.key : newApi.key}
               onChange={(e) =>
                 editingApi
