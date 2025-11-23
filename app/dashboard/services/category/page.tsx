@@ -387,7 +387,7 @@ export default function CategoryPage() {
                     </PaginationLink>
                   </PaginationItem>
                 ))}
-                {totalPages > 5 && <PaginationItem><PaginationEllipsis /></PaginationItem>}
+                {totalPages > 5 && <PaginationItem></PaginationItem>}
                 <PaginationItem>
                   <PaginationNext
                     href="#"
@@ -464,30 +464,6 @@ export default function CategoryPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description_uz">Description (Uzbek)</Label>
-            <Textarea
-              id="description_uz"
-              value={newCategory.description_uz}
-              onChange={(e) => setNewCategory({ ...newCategory, description_uz: e.target.value })}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description_ru">Description (Russian)</Label>
-            <Textarea
-              id="description_ru"
-              value={newCategory.description_ru}
-              onChange={(e) => setNewCategory({ ...newCategory, description_ru: e.target.value })}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description_en">Description (English)</Label>
-            <Textarea
-              id="description_en"
-              value={newCategory.description_en}
-              onChange={(e) => setNewCategory({ ...newCategory, description_en: e.target.value })}
-            />
           </div>
           <div className="flex items-center gap-2">
             <Label htmlFor="is_active">Active</Label>

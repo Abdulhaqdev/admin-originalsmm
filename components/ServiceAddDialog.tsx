@@ -10,6 +10,7 @@ import { DurationInput } from "@/components/ui/duration-input";
 import { FormMessage } from "@/components/ui/form";
 import { getInfoByService } from "@/lib/apiservice";
 import { Api, Category, FormErrors, Service } from "@/types";
+import { Download } from "lucide-react";
 
 interface ServiceAddDialogProps {
   open: boolean;
@@ -31,7 +32,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     min: 0,
     max: 0,
     price: 0,
-    percentage: "50",
+    percentage: "",
     site_id: 0,
     category: categories[0]?.id || 0,
     api: apis[0]?.id || 0,
@@ -40,7 +41,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [fetchingServiceInfo, setFetchingServiceInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isApiFetched, setIsApiFetched] = useState<boolean>(false); // Track if API data has been fetched
+  const [isApiFetched, setIsApiFetched] = useState<boolean>(false);
 
   useEffect(() => {
     if (newService.min > newService.max && newService.max !== 0) {
@@ -81,74 +82,37 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     return Object.keys(errors).length === 0;
   }, [newService]);
 
-  const handleApiChange = useCallback(
-    async (apiId: string) => {
-      const api_id = Number.parseInt(apiId);
-      setNewService((prev) => ({ ...prev, api: api_id }));
-
-      if (newService.site_id && api_id) {
-        try {
-          setFetchingServiceInfo(true);
-          setIsApiFetched(true); // Mark API data as fetched
-          const serviceInfo = await getInfoByService(newService.site_id, api_id);
-          setNewService((prev) => ({
-            ...prev,
-            name_en: serviceInfo.name,
-            min: serviceInfo.min_quantity,
-            max: serviceInfo.max_quantity,
-            price: serviceInfo.price,
-            percentage: serviceInfo.percentage,
-          }));
-          setFormErrors((prev) => {
-            const { min, max, price, percentage, name_en, ...rest } = prev;
-            return rest;
-          });
-        } catch (err) {
-          setError((err as { message?: string }).message || "Failed to fetch service info");
-          setIsApiFetched(false); // Reset if fetch fails
-        } finally {
-          setFetchingServiceInfo(false);
-        }
-      } else {
-        setIsApiFetched(false); // Reset if no valid site_id or api_id
-      }
-    },
-    [newService.site_id],
-  );
-
-  const handleSiteIdChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const site_id = Number.parseInt(e.target.value) || 0;
-      setNewService((prev) => ({ ...prev, site_id }));
-      if (newService.api && site_id) {
-        try {
-          setFetchingServiceInfo(true);
-          setIsApiFetched(true); // Mark API data as fetched
-          const serviceInfo = await getInfoByService(site_id, newService.api);
-          setNewService((prev) => ({
-            ...prev,
-            name_en: serviceInfo.name,
-            min: serviceInfo.min_quantity,
-            max: serviceInfo.max_quantity,
-            price: serviceInfo.price,
-            percentage: serviceInfo.percentage,
-          }));
-          setFormErrors((prev) => {
-            const { min, max, price, percentage, name_en, ...rest } = prev;
-            return rest;
-          });
-        } catch (err) {
-          setError((err as { message?: string }).message || "Failed to fetch service info");
-          setIsApiFetched(false); // Reset if fetch fails
-        } finally {
-          setFetchingServiceInfo(false);
-        }
-      } else {
-        setIsApiFetched(false); // Reset if no valid site_id or api_id
-      }
-    },
-    [newService.api],
-  );
+  // Fetch service info from API
+  const fetchServiceInfo = useCallback(async () => {
+    if (!newService.site_id || !newService.api) {
+      setError("Please select both Site ID and API");
+      return;
+    }
+    
+    try {
+      setFetchingServiceInfo(true);
+      setError(null);
+      const serviceInfo = await getInfoByService(newService.site_id, newService.api);
+      setNewService((prev) => ({
+        ...prev,
+        name_en: serviceInfo.name,
+        min: serviceInfo.min_quantity,
+        max: serviceInfo.max_quantity,
+        price: serviceInfo.price,
+        percentage: serviceInfo.percentage,
+      }));
+      setFormErrors((prev) => {
+        const { min, max, price, percentage, name_en, ...rest } = prev;
+        return rest;
+      });
+      setIsApiFetched(true);
+    } catch (err) {
+      setError((err as { message?: string }).message || "Failed to fetch service info");
+      setIsApiFetched(false);
+    } finally {
+      setFetchingServiceInfo(false);
+    }
+  }, [newService.site_id, newService.api]);
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
@@ -165,7 +129,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
         min: 0,
         max: 0,
         price: 0,
-        percentage: "50",
+        percentage: "",
         site_id: 0,
         category: categories[0]?.id || 0,
         api: apis[0]?.id || 0,
@@ -180,20 +144,17 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     }
   };
 
-  // Handle number input changes to prevent clearing 0
   const handleNumberInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     field: keyof Omit<Service, "id" | "created_at" | "updated_at">,
   ) => {
     const value = e.target.value;
-    // Allow empty string during typing, but convert to 0 if empty on blur
     setNewService((prev) => ({
       ...prev,
       [field]: value === "" ? 0 : field === "percentage" ? value : Number.parseFloat(value) || 0,
     }));
   };
 
-  // Handle blur to ensure 0 is set if input is empty
   const handleNumberInputBlur = (
     e: React.FocusEvent<HTMLInputElement>,
     field: keyof Omit<Service, "id" | "created_at" | "updated_at">,
@@ -221,7 +182,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
       }
     >
       <div className="grid gap-4 py-4">
-        {error && <div className="text-red-500">{error}</div>}
+        {error && <div className="text-red-500 text-sm">{error}</div>}
         <div className="grid gap-2">
           <Label htmlFor="category">
             Category<span className="text-destructive ml-1">*</span>
@@ -243,6 +204,55 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
           </Select>
           {formErrors.category && <FormMessage>{formErrors.category}</FormMessage>}
         </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="site-id">
+            Site ID<span className="text-destructive ml-1">*</span>
+          </Label>
+          <Input
+            id="site-id"
+            type="number"
+            min="0"
+            value={newService.site_id === 0 ? "" : newService.site_id}
+            onChange={(e) => setNewService({ ...newService, site_id: Number.parseInt(e.target.value) || 0 })}
+            onBlur={(e) => handleNumberInputBlur(e, "site_id")}
+            required
+            placeholder="Enter Site ID"
+          />
+          {formErrors.site_id && <FormMessage>{formErrors.site_id}</FormMessage>}
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="api">
+            API<span className="text-destructive ml-1">*</span>
+          </Label>
+          <Select
+            value={newService.api.toString()}
+            onValueChange={(value) => setNewService({ ...newService, api: Number.parseInt(value) })}
+          >
+            <SelectTrigger id="api">
+              <SelectValue placeholder="Select an API" />
+            </SelectTrigger>
+            <SelectContent>
+              {apis.map((api) => (
+                <SelectItem key={api.id} value={api.id.toString()}>
+                  {api.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {formErrors.api && <FormMessage>{formErrors.api}</FormMessage>}
+        </div>
+
+        <Button 
+          onClick={fetchServiceInfo} 
+          disabled={fetchingServiceInfo || !newService.site_id || !newService.api}
+          className="w-full"
+          variant="secondary"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          {fetchingServiceInfo ? "Loading..." : "Load Service Info"}
+        </Button>
 
         <div className="grid gap-2">
           <Label htmlFor="name_uz">
@@ -331,46 +341,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
             required
           />
           {formErrors.description_en && <FormMessage>{formErrors.description_en}</FormMessage>}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="site-id">
-            Site ID<span className="text-destructive ml-1">*</span>
-          </Label>
-          <Input
-            id="site-id"
-            type="number"
-            min="0"
-            value={newService.site_id === 0 ? "" : newService.site_id}
-            onChange={handleSiteIdChange}
-            onBlur={(e) => handleNumberInputBlur(e, "site_id")}
-            required
-            disabled={fetchingServiceInfo}
-          />
-          {formErrors.site_id && <FormMessage>{formErrors.site_id}</FormMessage>}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="api">
-            API<span className="text-destructive ml-1">*</span>
-          </Label>
-          <Select
-            value={newService.api.toString()}
-            onValueChange={handleApiChange}
-            disabled={fetchingServiceInfo}
-          >
-            <SelectTrigger id="api">
-              <SelectValue placeholder="Select an API" />
-            </SelectTrigger>
-            <SelectContent>
-              {apis.map((api) => (
-                <SelectItem key={api.id} value={api.id.toString()}>
-                  {api.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {formErrors.api && <FormMessage>{formErrors.api}</FormMessage>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

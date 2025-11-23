@@ -558,7 +558,7 @@ export const getInfoByService = async (site_id: number, api_id: number): Promise
       percentage: data.percentage || "50", // Default percentage if not provided
     };
   } catch (error) {
-    console.error("getInfoByService error:", error);
-    return handleError(error as AxiosError<ErrorResponse>);
+    // console.error("getInfoByService error:", error);
+    return handleError(   "No data returned from the API" as unknown as AxiosError<ErrorResponse>);
   }
 };

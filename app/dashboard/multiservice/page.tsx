@@ -26,6 +26,7 @@ interface ServiceForm {
   max: number;
   price: number;
   percentage: string;
+  percent: string;
   site_id: number;
   api: number;
   is_active: boolean;

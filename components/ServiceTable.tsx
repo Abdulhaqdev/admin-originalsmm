@@ -117,7 +117,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
                   onCheckedChange={() => onSelectService(service.id)}
                 />
               </TableCell>
-              <TableCell className="font-medium">{service.name_en}</TableCell>
+              <TableCell className="font-medium">{service.name_uz}</TableCell>
               <TableCell>{getCategoryName(service.category)}</TableCell>
               <TableCell>${service.price}</TableCell>
               <TableCell>{service.percentage}%</TableCell>
