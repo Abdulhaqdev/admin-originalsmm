@@ -245,7 +245,7 @@ export default function CategoryPage() {
                 <TableRow>
                   <TableHead className="cursor-pointer" onClick={() => handleSort("name_en")}>
                     <div className="flex items-center gap-1">
-                      Name (EN)
+                      Name (Uzbek)
                       {sortField === "name_en" &&
                         (sortDirection === "asc" ? (
                           <ChevronUp className="h-4 w-4" />
@@ -254,17 +254,7 @@ export default function CategoryPage() {
                         ))}
                     </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("description_en")}>
-                    <div className="flex items-center gap-1">
-                      Description (EN)
-                      {sortField === "description_en" &&
-                        (sortDirection === "asc" ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        ))}
-                    </div>
-                  </TableHead>
+              
                   <TableHead className="cursor-pointer" onClick={() => handleSort("is_active")}>
                     <div className="flex items-center gap-1">
                       Status
@@ -307,10 +297,9 @@ export default function CategoryPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <SocialIcon iconName={category.icon} className="h-5 w-5" />
-                        <span>{category.name_en}</span>
+                        <span>{category.name_uz}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{category.description_en || "No description"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div

@@ -49,6 +49,7 @@ export interface Service {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  auto_update: boolean;
 }
 
 export interface FormErrors {

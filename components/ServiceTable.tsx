@@ -49,7 +49,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
   onBulkDelete,
 }) => {
   const getCategoryName = (categoryId: number) => {
-    return categories.find((cat) => cat.id === categoryId)?.name_en || "Unknown";
+    return categories.find((cat) => cat.id === categoryId)?.name_uz || "Unknown";
   };
 
   const getApiName = (apiId: number) => {
@@ -69,7 +69,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
             </TableHead>
             <TableHead className="cursor-pointer" onClick={() => onSort("name_en")}>
               <div className="flex items-center gap-1">
-                Name (EN)
+                Name (Uzbek)
                 {sortField === "name_en" &&
                   (sortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
               </div>
@@ -119,7 +119,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
               </TableCell>
               <TableCell className="font-medium">{service.name_uz}</TableCell>
               <TableCell>{getCategoryName(service.category)}</TableCell>
-              <TableCell>${service.price}</TableCell>
+              <TableCell>{service.price}</TableCell>
               <TableCell>{service.percentage}%</TableCell>
               <TableCell>{`${service.min}-${service.max}`}</TableCell>
               <TableCell>{formatDuration(service.duration)}</TableCell>

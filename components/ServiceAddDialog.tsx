@@ -32,11 +32,12 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     min: 0,
     max: 0,
     price: 0,
-    percentage: "",
+    percentage: "50",
     site_id: 0,
     category: categories[0]?.id || 0,
     api: apis[0]?.id || 0,
     is_active: true,
+    auto_update: false,
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [fetchingServiceInfo, setFetchingServiceInfo] = useState<boolean>(false);
@@ -58,6 +59,45 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     }
   }, [newService.min, newService.max]);
 
+  // Load saved name/description draft when dialog opens
+  useEffect(() => {
+    if (open) {
+      try {
+        const saved = localStorage.getItem("service_draft");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setNewService((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch {
+        /* ignore parse errors */
+      }
+    }
+  }, [open]);
+
+  // Persist name/description fields to localStorage (draft)
+  useEffect(() => {
+    const draft = {
+      name_uz: newService.name_uz,
+      name_ru: newService.name_ru,
+      name_en: newService.name_en,
+      description_uz: newService.description_uz,
+      description_ru: newService.description_ru,
+      description_en: newService.description_en,
+    };
+    try {
+      localStorage.setItem("service_draft", JSON.stringify(draft));
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [
+    newService.name_uz,
+    newService.name_ru,
+    newService.name_en,
+    newService.description_uz,
+    newService.description_ru,
+    newService.description_en,
+  ]);
+
   const validateForm = useCallback(() => {
     const errors: FormErrors = {};
     if (!newService.name_uz) errors.name_uz = "Name (Uzbek) is required";
@@ -66,8 +106,8 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     if (!newService.description_uz) errors.description_uz = "Description (Uzbek) is required";
     if (!newService.description_ru) errors.description_ru = "Description (Russian) is required";
     if (!newService.description_en) errors.description_en = "Description (English) is required";
-    if (newService.price === undefined || newService.price === null || isNaN(newService.price))
-      errors.price = "Price is required or invalid";
+    if (newService.price === undefined || newService.price === null || isNaN(newService.price) || newService.price < 0)
+      errors.price = "Price must be 0 or greater";
     if (!newService.percentage) errors.percentage = "Percentage is required";
     else if (parseFloat(newService.percentage) < 0 || parseFloat(newService.percentage) > 100)
       errors.percentage = "Percentage must be between 0 and 100";
@@ -129,15 +169,18 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
         min: 0,
         max: 0,
         price: 0,
-        percentage: "",
+        percentage: "50",
         site_id: 0,
         category: categories[0]?.id || 0,
         api: apis[0]?.id || 0,
         is_active: true,
+        auto_update: false,
       });
       setFormErrors({});
       setError(null);
       setIsApiFetched(false);
+      // clear saved draft after successful submit
+      try { localStorage.removeItem("service_draft"); } catch {}
       onOpenChange(false);
     } catch (err) {
       setError((err as { message?: string }).message || "Xizmat qo'shishda xato yuz berdi");
@@ -160,7 +203,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     field: keyof Omit<Service, "id" | "created_at" | "updated_at">,
   ) => {
     if (e.target.value === "") {
-      setNewService((prev) => ({ ...prev, [field]: 0 }));
+      setNewService((prev) => ({ ...prev, [field]: field === "percentage" ? "0" : 0 }));
     }
   };
 
@@ -403,6 +446,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
               type="number"
               min="0"
               max="100"
+              step="0.01"
               value={newService.percentage === "0" ? "" : newService.percentage}
               onChange={(e) => handleNumberInputChange(e, "percentage")}
               onBlur={(e) => handleNumberInputBlur(e, "percentage")}
@@ -412,13 +456,23 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Label htmlFor="is_active">Active</Label>
-          <Switch
-            id="is_active"
-            checked={newService.is_active}
-            onCheckedChange={(checked) => setNewService({ ...newService, is_active: checked })}
-          />
+        <div className="flex items-center gap-10">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="is_active">Active</Label>
+            <Switch
+              id="is_active"
+              checked={newService.is_active}
+              onCheckedChange={(checked) => setNewService({ ...newService, is_active: checked })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="auto_update">Auto Update</Label>
+            <Switch
+              id="auto_update"
+              checked={newService.auto_update}
+              onCheckedChange={(checked) => setNewService({ ...newService, auto_update: checked })}
+            />
+          </div>
         </div>
       </div>
     </Modal>

@@ -10,6 +10,7 @@ import { DurationInput } from "@/components/ui/duration-input";
 import { FormMessage } from "@/components/ui/form";
 import { getInfoByService } from "@/lib/apiservice";
 import { Api, Category, FormErrors, Service } from "@/types";
+import { Download } from "lucide-react";
 
 interface ServiceEditDialogProps {
   open: boolean;
@@ -32,11 +33,11 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
   const [editFormErrors, setEditFormErrors] = useState<FormErrors>({});
   const [fetchingServiceInfo, setFetchingServiceInfo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isApiFetched, setIsApiFetched] = useState<boolean>(false); // Track if API data has been fetched
+  const [isApiFetched, setIsApiFetched] = useState<boolean>(false);
 
   useEffect(() => {
     setEditService(service);
-    setIsApiFetched(false); // Reset API fetch state when service changes
+    setIsApiFetched(false);
   }, [service]);
 
   useEffect(() => {
@@ -64,8 +65,8 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     if (!editService.description_uz) errors.description_uz = "Description (Uzbek) is required";
     if (!editService.description_ru) errors.description_ru = "Description (Russian) is required";
     if (!editService.description_en) errors.description_en = "Description (English) is required";
-    if (editService.price === undefined || editService.price === null || isNaN(editService.price))
-      errors.price = "Price is required or invalid";
+    if (editService.price === undefined || editService.price === null || isNaN(editService.price) || editService.price < 0)
+      errors.price = "Price must be 0 or greater";
     if (!editService.percentage) errors.percentage = "Percentage is required";
     else if (parseFloat(editService.percentage) < 0 || parseFloat(editService.percentage) > 100)
       errors.percentage = "Percentage must be between 0 and 100";
@@ -80,77 +81,37 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     return Object.keys(errors).length === 0;
   }, [editService]);
 
-  const handleApiChange = useCallback(
-    async (apiId: string) => {
-      if (!editService) return;
-      const api_id = Number.parseInt(apiId);
-      setEditService((prev) => prev && ({ ...prev, api: api_id }));
-
-      if (editService.site_id && api_id) {
-        try {
-          setFetchingServiceInfo(true);
-          setIsApiFetched(true); // Mark API data as fetched
-          const serviceInfo = await getInfoByService(editService.site_id, api_id);
-          setEditService((prev) => prev && ({
-            ...prev,
-            name_en: serviceInfo.name,
-            min: serviceInfo.min_quantity,
-            max: serviceInfo.max_quantity,
-            price: serviceInfo.price,
-            percentage: serviceInfo.percentage,
-          }));
-          setEditFormErrors((prev) => {
-            const { min, max, price, percentage, name_en, ...rest } = prev;
-            return rest;
-          });
-        } catch (err) {
-          setError((err as { message?: string }).message || "Failed to fetch service info");
-          setIsApiFetched(false); // Reset if fetch fails
-        } finally {
-          setFetchingServiceInfo(false);
-        }
-      } else {
-        setIsApiFetched(false); // Reset if no valid site_id or api_id
-      }
-    },
-    [editService],
-  );
-
-  const handleSiteIdChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!editService) return;
-      const site_id = Number.parseInt(e.target.value) || 0;
-      setEditService((prev) => prev && ({ ...prev, site_id }));
-
-      if (editService.api && site_id) {
-        try {
-          setFetchingServiceInfo(true);
-          setIsApiFetched(true); // Mark API data as fetched
-          const serviceInfo = await getInfoByService(site_id, editService.api);
-          setEditService((prev) => prev && ({
-            ...prev,
-            name_en: serviceInfo.name,
-            min: serviceInfo.min_quantity,
-            max: serviceInfo.max_quantity,
-            price: serviceInfo.price,
-            percentage: serviceInfo.percentage,
-          }));
-          setEditFormErrors((prev) => {
-            const { min, max, price, percentage, name_en, ...rest } = prev;
-            return rest;
-          });
-        } catch (err) {
-          setError((err as { message?: string }).message || "Failed to fetch service info");
-          setIsApiFetched(false); // Reset if fetch fails
-        } finally {
-          setFetchingServiceInfo(false);
-        }
-      } else {
-        setIsApiFetched(false); // Reset if no valid site_id or api_id
-      }
-    },
-    [editService],
-  );
+  // Fetch service info from API
+  const fetchServiceInfo = useCallback(async () => {
+    if (!editService || !editService.site_id || !editService.api) {
+      setError("Please select both Site ID and API");
+      return;
+    }
+    
+    try {
+      setFetchingServiceInfo(true);
+      setError(null);
+      const serviceInfo = await getInfoByService(editService.site_id, editService.api);
+      setEditService((prev) => prev && ({
+        ...prev,
+        name_en: serviceInfo.name,
+        min: serviceInfo.min_quantity,
+        max: serviceInfo.max_quantity,
+        price: serviceInfo.price,
+        percentage: serviceInfo.percentage,
+      }));
+      setEditFormErrors((prev) => {
+        const { min, max, price, percentage, name_en, ...rest } = prev;
+        return rest;
+      });
+      setIsApiFetched(true);
+    } catch (err) {
+      setError((err as { message?: string }).message || "Failed to fetch service info");
+      setIsApiFetched(false);
+    } finally {
+      setFetchingServiceInfo(false);
+    }
+  }, [editService?.site_id, editService?.api]);
 
   const handleSubmit = async () => {
     if (!editService || !validateEditForm()) return;
@@ -165,7 +126,6 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     }
   };
 
-  // Handle number input changes to prevent clearing 0
   const handleNumberInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     field: keyof Service,
@@ -178,14 +138,13 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     }));
   };
 
-  // Handle blur to ensure 0 is set if input is empty
   const handleNumberInputBlur = (
     e: React.FocusEvent<HTMLInputElement>,
     field: keyof Service,
   ) => {
     if (!editService) return;
     if (e.target.value === "") {
-      setEditService((prev) => prev && ({ ...prev, [field]: 0 }));
+      setEditService((prev) => prev && ({ ...prev, [field]: field === "percentage" ? "0" : 0 }));
     }
   };
 
@@ -209,7 +168,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
       }
     >
       <div className="grid gap-4 py-4">
-        {error && <div className="text-red-500">{error}</div>}
+        {error && <div className="text-red-500 text-sm">{error}</div>}
         <div className="grid gap-2">
           <Label htmlFor="edit-category">
             Category<span className="text-destructive ml-1">*</span>
@@ -231,6 +190,54 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           </Select>
           {editFormErrors.category && <FormMessage>{editFormErrors.category}</FormMessage>}
         </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="edit-site-id">
+            Site ID<span className="text-destructive ml-1">*</span>
+          </Label>
+          <Input
+            id="edit-site-id"
+            type="number"
+            min="0"
+            value={editService.site_id === 0 ? "" : editService.site_id}
+            onChange={(e) => setEditService({ ...editService, site_id: Number.parseInt(e.target.value) || 0 })}
+            onBlur={(e) => handleNumberInputBlur(e, "site_id")}
+            required
+          />
+          {editFormErrors.site_id && <FormMessage>{editFormErrors.site_id}</FormMessage>}
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="edit-api">
+            API<span className="text-destructive ml-1">*</span>
+          </Label>
+          <Select
+            value={editService.api.toString()}
+            onValueChange={(value) => setEditService({ ...editService, api: Number.parseInt(value) })}
+          >
+            <SelectTrigger id="edit-api">
+              <SelectValue placeholder="Select an API" />
+            </SelectTrigger>
+            <SelectContent>
+              {apis.map((api) => (
+                <SelectItem key={api.id} value={api.id.toString()}>
+                  {api.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {editFormErrors.api && <FormMessage>{editFormErrors.api}</FormMessage>}
+        </div>
+
+        <Button 
+          onClick={fetchServiceInfo} 
+          disabled={fetchingServiceInfo || !editService.site_id || !editService.api}
+          className="w-full"
+          variant="secondary"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          {fetchingServiceInfo ? "Loading..." : "Load Service Info"}
+        </Button>
 
         <div className="grid gap-2">
           <Label htmlFor="edit-name_uz">
@@ -267,7 +274,6 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             value={editService.name_en}
             onChange={(e) => setEditService({ ...editService, name_en: e.target.value })}
             required
-            disabled={isApiFetched}
           />
           {editFormErrors.name_en && <FormMessage>{editFormErrors.name_en}</FormMessage>}
         </div>
@@ -317,45 +323,6 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             required
           />
           {editFormErrors.description_en && <FormMessage>{editFormErrors.description_en}</FormMessage>}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="edit-site-id">
-            Site ID<span className="text-destructive ml-1">*</span>
-          </Label>
-          <Input
-            id="edit-site-id"
-            type="number"
-            min="0"
-            value={editService.site_id === 0 ? "" : editService.site_id}
-            onChange={handleSiteIdChange}
-            onBlur={(e) => handleNumberInputBlur(e, "site_id")}
-            required
-          />
-          {editFormErrors.site_id && <FormMessage>{editFormErrors.site_id}</FormMessage>}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="edit-api">
-            API<span className="text-destructive ml-1">*</span>
-          </Label>
-          <Select
-            value={editService.api.toString()}
-            onValueChange={handleApiChange}
-            disabled={fetchingServiceInfo}
-          >
-            <SelectTrigger id="edit-api">
-              <SelectValue placeholder="Select an API" />
-            </SelectTrigger>
-            <SelectContent>
-              {apis.map((api) => (
-                <SelectItem key={api.id} value={api.id.toString()}>
-                  {api.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {editFormErrors.api && <FormMessage>{editFormErrors.api}</FormMessage>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -418,6 +385,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
               type="number"
               min="0"
               max="100"
+              step="0.01"
               value={editService.percentage === "0" ? "" : editService.percentage}
               onChange={(e) => handleNumberInputChange(e, "percentage")}
               onBlur={(e) => handleNumberInputBlur(e, "percentage")}
@@ -427,13 +395,23 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Label htmlFor="edit-is_active">Active</Label>
-          <Switch
-            id="edit-is_active"
-            checked={editService.is_active}
-            onCheckedChange={(checked) => setEditService({ ...editService, is_active: checked })}
-          />
+        <div className="flex items-center gap-10">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="edit-is_active">Active</Label>
+            <Switch
+              id="edit-is_active"
+              checked={editService.is_active}
+              onCheckedChange={(checked) => setEditService({ ...editService, is_active: checked })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="edit-auto_update">Auto Update</Label>
+            <Switch
+              id="edit-auto_update"
+              checked={editService.auto_update}
+              onCheckedChange={(checked) => setEditService({ ...editService, auto_update: checked })}
+            />
+          </div>
         </div>
       </div>
     </Modal>

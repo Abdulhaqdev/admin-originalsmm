@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { FormMessage } from "@/components/ui/form";
 import { DurationInput } from "@/components/ui/duration-input";
 import { apiClient, getApis, getCategories } from "@/lib/apiservice";
-import { Api, Category } from "../services/service/page";
+import { Api, Category } from "@/types";
 
 interface ServiceForm {
   name_uz: string;
