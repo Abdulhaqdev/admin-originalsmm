@@ -62,7 +62,7 @@ export default function ServicePage() {
           description_uz: svc.description_uz ?? "",
           description_ru: svc.description_ru ?? "",
           description_en: svc.description_en ?? "",
-          percentage: svc.percentage ?? "50",
+          percentage: svc.percent ?? "50",
         }));
         setCategories(normalizedCategories);
         setServices(normalizedServices);
@@ -107,11 +107,7 @@ export default function ServicePage() {
     if (sortField === "duration") {
       return sortDirection === "asc" ? a.duration - b.duration : b.duration - a.duration;
     }
-    if (sortField === "percentage") {
-      return sortDirection === "asc"
-        ? parseFloat(a.percentage) - parseFloat(b.percentage)
-        : parseFloat(b.percentage) - parseFloat(a.percentage);
-    }
+  
     const aField = a[sortField] ?? "";
     const bField = b[sortField] ?? "";
     if (aField < bField) return sortDirection === "asc" ? -1 : 1;
@@ -144,7 +140,7 @@ export default function ServicePage() {
         description_uz: createdService.description_uz ?? "",
         description_ru: createdService.description_ru ?? "",
         description_en: createdService.description_en ?? "",
-        percentage: createdService.percentage ?? "50",
+        percent: createdService.percent,
       },
     ]);
     setCurrentPage(1);
@@ -160,7 +156,7 @@ export default function ServicePage() {
               description_uz: updatedService.description_uz ?? "",
               description_ru: updatedService.description_ru ?? "",
               description_en: updatedService.description_en ?? "",
-              percentage: updatedService.percentage ?? "50",
+              percentage: updatedService.percent,
             }
           : s,
       ),

@@ -16,7 +16,7 @@ export interface Api {
   id: number;
   name: string;
   url: string;
-  exchange: {
+  exchange?: {
     id: number;
     name: string;
     price: string;
@@ -24,10 +24,10 @@ export interface Api {
     updated_at: string;
     is_active: boolean;
   };
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
-  key: string;
+  created_at?: string;
+  updated_at?: string;
+  is_active?: boolean;
+  key?: string;
 }
 
 export interface Service {
@@ -42,14 +42,14 @@ export interface Service {
   min: number;
   max: number;
   price: number;
-  percentage: string;
   site_id: number;
   category: number;
   api: number;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  auto_update: boolean;
+  created_at?: string;
+  updated_at?: string;
+  percent?: number;
+  auto_update?: boolean;
 }
 
 export interface FormErrors {
@@ -81,5 +81,5 @@ export interface ServiceInfo {
   min_quantity: number;
   max_quantity: number;
   price: number;
-  percentage: string;
+  percentage: string | number;
 }

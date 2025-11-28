@@ -67,9 +67,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     if (!editService.description_en) errors.description_en = "Description (English) is required";
     if (editService.price === undefined || editService.price === null || isNaN(editService.price) || editService.price < 0)
       errors.price = "Price must be 0 or greater";
-    if (!editService.percentage) errors.percentage = "Percentage is required";
-    else if (parseFloat(editService.percentage) < 0 || parseFloat(editService.percentage) > 100)
-      errors.percentage = "Percentage must be between 0 and 100";
+    if (!editService.percent) errors.percentage = "Percentage is required";
     if (editService.min === undefined || editService.min === null || editService.min < 0)
       errors.min = "Min quantity must be 0 or greater";
     if (editService.max === undefined || editService.max === null || editService.max < 0)
@@ -98,7 +96,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
         min: serviceInfo.min_quantity,
         max: serviceInfo.max_quantity,
         price: serviceInfo.price,
-        percentage: serviceInfo.percentage,
+        percent: serviceInfo.percent,
       }));
       setEditFormErrors((prev) => {
         const { min, max, price, percentage, name_en, ...rest } = prev;
@@ -134,7 +132,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     const value = e.target.value;
     setEditService((prev) => prev && ({
       ...prev,
-      [field]: value === "" ? 0 : field === "percentage" ? value : Number.parseFloat(value) || 0,
+      [field]: value === "" ? 0 : field === "percent" ? value : Number.parseFloat(value) || 0,
     }));
   };
 
@@ -144,7 +142,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
   ) => {
     if (!editService) return;
     if (e.target.value === "") {
-      setEditService((prev) => prev && ({ ...prev, [field]: field === "percentage" ? "0" : 0 }));
+      setEditService((prev) => prev && ({ ...prev, [field]: field === "percent" ? "0" : 0 }));
     }
   };
 
@@ -386,9 +384,9 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
               min="0"
               max="100"
               step="0.01"
-              value={editService.percentage === "0" ? "" : editService.percentage}
-              onChange={(e) => handleNumberInputChange(e, "percentage")}
-              onBlur={(e) => handleNumberInputBlur(e, "percentage")}
+              value={editService.percent === 0 ? "" : editService.percent}
+              onChange={(e) => handleNumberInputChange(e, "percent")}
+              onBlur={(e) => handleNumberInputBlur(e, "percent")}
               required
             />
             {editFormErrors.percentage && <FormMessage>{editFormErrors.percentage}</FormMessage>}

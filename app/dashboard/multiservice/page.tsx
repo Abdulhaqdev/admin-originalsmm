@@ -25,7 +25,6 @@ interface ServiceForm {
   min: number;
   max: number;
   price: number;
-  percentage: string;
   percent: string;
   site_id: number;
   api: number;
@@ -121,7 +120,7 @@ export default function MultiServiceCreatePage() {
           min: service.min || 10,
           max: service.max || 1000,
           price: service.price ? service.price / 1000 : 0.65, // Convert to dollars
-          percentage: service.percent.toString() || "0",
+          percent: service.percent.toString() || "0",
           site_id: service.site_id || 0,
           api: Number(selectedApi),
           is_active: true,
@@ -137,7 +136,7 @@ export default function MultiServiceCreatePage() {
           min: 10,
           max: 1000,
           price: 0.65,
-          percentage: "0",
+          percent: "0",
           site_id: 0,
           api: selectedApi ? Number(selectedApi) : apis[0]?.id || 0,
           is_active: true,
@@ -181,9 +180,9 @@ export default function MultiServiceCreatePage() {
     if (!service.description_en) errors.description_en = "Description (English) is required";
     if (service.price === undefined || service.price === null || isNaN(service.price))
       errors.price = "Price is required";
-    if (!service.percentage) errors.percentage = "Percentage is required";
-    else if (parseFloat(service.percentage) < 0 || parseFloat(service.percentage) > 100)
-      errors.percentage = "Percentage must be between 0 and 100";
+    if (!service.percent) errors.percent = "Percentage is required";
+    else if (parseFloat(service.percent) < 0 || parseFloat(service.percent) > 100)
+      errors.percent = "Percentage must be between 0 and 100";
     if (service.duration === 0) errors.duration = "Duration is required";
     if (!service.min) errors.min = "Min quantity is required";
     if (!service.max) errors.max = "Max quantity is required";
@@ -498,11 +497,11 @@ export default function MultiServiceCreatePage() {
                                     type="number"
                                     min="0"
                                     max="100"
-                                    value={service.percentage}
-                                    onChange={(e) => updateServiceForm(index, "percentage", e.target.value)}
+                                    value={service.percent}
+                                    onChange={(e) => updateServiceForm(index, "percent", e.target.value)}
                                     required
                                   />
-                                  {formErrors[index]?.percentage && <FormMessage>{formErrors[index].percentage}</FormMessage>}
+                                  {formErrors[index]?.percent && <FormMessage>{formErrors[index].percentage}</FormMessage>}
                                 </div>
                               </div>
 

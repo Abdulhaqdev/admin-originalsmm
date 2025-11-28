@@ -32,7 +32,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     min: 0,
     max: 0,
     price: 0,
-    percentage: "50",
+    percent: 0,
     site_id: 0,
     category: categories[0]?.id || 0,
     api: apis[0]?.id || 0,
@@ -59,7 +59,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     }
   }, [newService.min, newService.max]);
 
-  // Load saved name/description draft when dialog opens
   useEffect(() => {
     if (open) {
       try {
@@ -69,12 +68,10 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
           setNewService((prev) => ({ ...prev, ...parsed }));
         }
       } catch {
-        /* ignore parse errors */
       }
     }
   }, [open]);
 
-  // Persist name/description fields to localStorage (draft)
   useEffect(() => {
     const draft = {
       name_uz: newService.name_uz,
@@ -108,9 +105,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     if (!newService.description_en) errors.description_en = "Description (English) is required";
     if (newService.price === undefined || newService.price === null || isNaN(newService.price) || newService.price < 0)
       errors.price = "Price must be 0 or greater";
-    if (!newService.percentage) errors.percentage = "Percentage is required";
-    else if (parseFloat(newService.percentage) < 0 || parseFloat(newService.percentage) > 100)
-      errors.percentage = "Percentage must be between 0 and 100";
+    if (!newService.percent) errors.percentage = "Percentage is required";
     if (newService.min === undefined || newService.min === null || newService.min < 0)
       errors.min = "Min quantity must be 0 or greater";
     if (newService.max === undefined || newService.max === null || newService.max < 0)
@@ -139,7 +134,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
         min: serviceInfo.min_quantity,
         max: serviceInfo.max_quantity,
         price: serviceInfo.price,
-        percentage: serviceInfo.percentage,
+        percent: serviceInfo.percent,
       }));
       setFormErrors((prev) => {
         const { min, max, price, percentage, name_en, ...rest } = prev;
@@ -169,7 +164,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
         min: 0,
         max: 0,
         price: 0,
-        percentage: "50",
+        percent: 0,
         site_id: 0,
         category: categories[0]?.id || 0,
         api: apis[0]?.id || 0,
@@ -194,7 +189,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     const value = e.target.value;
     setNewService((prev) => ({
       ...prev,
-      [field]: value === "" ? 0 : field === "percentage" ? value : Number.parseFloat(value) || 0,
+      [field]: value === "" ? 0 : field === "percent" ? value : Number.parseFloat(value) || 0,
     }));
   };
 
@@ -203,7 +198,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     field: keyof Omit<Service, "id" | "created_at" | "updated_at">,
   ) => {
     if (e.target.value === "") {
-      setNewService((prev) => ({ ...prev, [field]: field === "percentage" ? "0" : 0 }));
+      setNewService((prev) => ({ ...prev, [field]: field === "percent" ? "0" : 0 }));
     }
   };
 
@@ -447,9 +442,9 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
               min="0"
               max="100"
               step="0.01"
-              value={newService.percentage === "0" ? "" : newService.percentage}
-              onChange={(e) => handleNumberInputChange(e, "percentage")}
-              onBlur={(e) => handleNumberInputBlur(e, "percentage")}
+              value={newService.percent === 0 ? "" : newService.percent}
+              onChange={(e) => handleNumberInputChange(e, "percent")}
+              onBlur={(e) => handleNumberInputBlur(e, "percent")}
               required
             />
             {formErrors.percentage && <FormMessage>{formErrors.percentage}</FormMessage>}

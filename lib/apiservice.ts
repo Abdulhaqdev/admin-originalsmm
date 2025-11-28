@@ -1,3 +1,4 @@
+import { Service } from "@/types";
 import axios, { AxiosResponse, AxiosError } from "axios";
 
 // -------------------- AUTHENTICATION RELATED -------------------- //
@@ -173,25 +174,7 @@ export const getOrders = async (limit: number = 10, offset: number = 0): Promise
 };
 
 // -------------------- SERVICE RELATED -------------------- //
-interface Service {
-  id: number;
-  name_uz: string;
-  name_ru: string;
-  name_en: string;
-  description_uz: string;
-  description_ru: string;
-  description_en: string;
-  duration: number;
-  min: number;
-  max: number;
-  price: number;
-  site_id: number;
-  category: number;
-  api: number;
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
-}
+
 
 export const getServices = async (limit: number = 10, offset: number = 0): Promise<PaginatedResponse<Service>> => {
   try {
@@ -534,7 +517,7 @@ interface ServiceInfo {
   min_quantity: number;
   max_quantity: number;
   price: number;
-  percentage: string;
+  percent: number;
 }
 
 export const getInfoByService = async (site_id: number, api_id: number): Promise<ServiceInfo> => {
@@ -554,11 +537,10 @@ export const getInfoByService = async (site_id: number, api_id: number): Promise
       name: data.name || "",
       min_quantity: data.min || 0,
       max_quantity: data.max || 0,
-      price: data.price ? data.price / 1000 : 0, // Convert price from cents to dollars
-      percentage: data.percentage || "50", // Default percentage if not provided
+      price: data.price , 
+      percent: data.percent , // Default percentage if not provided
     };
   } catch (error) {
-    // console.error("getInfoByService error:", error);
     return handleError(   "No data returned from the API" as unknown as AxiosError<ErrorResponse>);
   }
 };

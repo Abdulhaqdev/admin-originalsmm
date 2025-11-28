@@ -82,10 +82,10 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
                   (sortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
               </div>
             </TableHead>
-            <TableHead className="cursor-pointer" onClick={() => onSort("percentage")}>
+            <TableHead className="cursor-pointer" onClick={() => onSort("percent")}>
               <div className="flex items-center gap-1">
                 Percentage
-                {sortField === "percentage" &&
+                {sortField === "percent" &&
                   (sortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
               </div>
             </TableHead>
@@ -120,7 +120,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
               <TableCell className="font-medium">{service.name_uz}</TableCell>
               <TableCell>{getCategoryName(service.category)}</TableCell>
               <TableCell>{service.price}</TableCell>
-              <TableCell>{service.percentage}%</TableCell>
+              <TableCell>{service.percent}%</TableCell>
               <TableCell>{`${service.min}-${service.max}`}</TableCell>
               <TableCell>{formatDuration(service.duration)}</TableCell>
               <TableCell>{getApiName(service.api)}</TableCell>
