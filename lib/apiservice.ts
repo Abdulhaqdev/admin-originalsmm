@@ -45,7 +45,6 @@ const getCookie = (name: string): string | null => {
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("access_token");
-    console.log(`Request to ${config.url} - Using token: ${token || "none"}`);
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     } else {
