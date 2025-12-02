@@ -527,30 +527,6 @@ export default function CategoryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-description_uz">Description (Uzbek)</Label>
-              <Textarea
-                id="edit-description_uz"
-                value={editCategory.description_uz || ""}
-                onChange={(e) => setEditCategory({ ...editCategory, description_uz: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-description_ru">Description (Russian)</Label>
-              <Textarea
-                id="edit-description_ru"
-                value={editCategory.description_ru || ""}
-                onChange={(e) => setEditCategory({ ...editCategory, description_ru: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-description_en">Description (English)</Label>
-              <Textarea
-                id="edit-description_en"
-                value={editCategory.description_en || ""}
-                onChange={(e) => setEditCategory({ ...editCategory, description_en: e.target.value })}
-              />
-            </div>
             <div className="flex items-center gap-2">
               <Label htmlFor="edit-is_active">Active</Label>
               <Switch

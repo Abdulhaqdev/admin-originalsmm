@@ -1,19 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Filter } from "lucide-react";
-import Link from "next/link";
+import { Loader2, Plus, Filter, Search } from "lucide-react";
 import { ServiceTable } from "@/components/ServiceTable";
-import { ServiceFilterDialog } from "@/components/ServiceFilterDialog";
 import { ServiceAddDialog } from "@/components/ServiceAddDialog";
 import { ServiceEditDialog } from "@/components/ServiceEditDialog";
-import { ServiceDeleteDialog } from "@/components/ServiceDeleteDialog";
+import { ServiceFilterDialog } from "@/components/ServiceFilterDialog";
+
+import {
+  getCategories,
+  getServices,
+  createService,
+  updateService,
+  deleteService,
+  getApis,
+} from "@/lib/apiservice";
+import { Service, Category, Api } from "@/types";
 import { ServicePagination } from "@/components/ServicePagination";
-import { getCategories, getServices, createService, updateService, deleteService, getApis } from "@/lib/apiservice";
-import { Api, Category, Service } from "@/types";
+import { ServiceDeleteDialog } from "@/components/ServiceDeleteDialog";
 
 export default function ServicePage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -38,18 +44,50 @@ export default function ServicePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filterApiId, setFilterApiId] = useState<number | "all">("all");
-  const itemsPerPage = 4;
+  const itemsPerPage = 10;
+
+  const fetchServices = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const offset = (currentPage - 1) * itemsPerPage;
+      
+      const filters: any = {};
+      if (filterCategory !== "all") filters.category = filterCategory;
+      if (filterApiId !== "all") filters.api = filterApiId;
+      if (filterActive !== "all") filters.is_active = filterActive;
+      if (filterPriceMin !== "") filters.price_min = filterPriceMin;
+      if (filterPriceMax !== "") filters.price_max = filterPriceMax;
+      if (searchQuery) filters.search = searchQuery;
+      
+      const servicesData = await getServices(itemsPerPage, offset, filters);
+      
+      const normalizedServices = servicesData.results.map((svc) => ({
+        ...svc,
+        description_uz: svc.description_uz ?? "",
+        description_ru: svc.description_ru ?? "",
+        description_en: svc.description_en ?? "",
+        percentage: svc.percent !== undefined ? String(svc.percent) : "50",
+      }));
+      
+      setServices(normalizedServices);
+      setTotalCount(servicesData.count);
+    } catch (err) {
+      setError((err as { message?: string }).message || "Ma'lumotlarni yuklashda xato yuz berdi");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, filterCategory, filterApiId, filterActive, filterPriceMin, filterPriceMax, searchQuery]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       try {
         setLoading(true);
-        const offset = (currentPage - 1) * itemsPerPage;
-        const [categoriesData, servicesData, apisData] = await Promise.all([
+        const [categoriesData, apisData] = await Promise.all([
           getCategories(100, 0),
-          getServices(itemsPerPage, offset),
-          getApis(),
+          getApis(100, 0),
         ]);
+        
         const normalizedCategories = categoriesData.results.map((cat) => ({
           ...cat,
           description_uz: cat.description_uz ?? "",
@@ -57,26 +95,22 @@ export default function ServicePage() {
           description_en: cat.description_en ?? "",
           icon: cat.icon ?? "",
         }));
-        const normalizedServices = servicesData.results.map((svc) => ({
-          ...svc,
-          description_uz: svc.description_uz ?? "",
-          description_ru: svc.description_ru ?? "",
-          description_en: svc.description_en ?? "",
-          percentage: svc.percent ?? "50",
-        }));
+        
         setCategories(normalizedCategories);
-        setServices(normalizedServices);
-        setTotalCount(servicesData.count);
         setApis(apisData.results);
       } catch (err) {
         setError((err as { message?: string }).message || "Ma'lumotlarni yuklashda xato yuz berdi");
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchData();
-  }, [currentPage]);
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (categories.length > 0 && apis.length > 0) {
+      fetchServices();
+    }
+  }, [categories, apis, fetchServices]);
 
   const handleSort = (field: keyof Service) => {
     if (sortField === field) {
@@ -87,19 +121,11 @@ export default function ServicePage() {
     }
   };
 
-  const filteredServices = services.filter((service) => {
-    if (filterCategory !== "all" && service.category !== filterCategory) return false;
-    if (filterActive !== "all" && service.is_active !== filterActive) return false;
-    if (filterPriceMin !== "" && service.price < filterPriceMin) return false;
-    if (filterPriceMax !== "" && service.price > filterPriceMax) return false;
-    if (filterApiId !== "all" && service.api !== filterApiId) return false;
-    if (searchQuery && !service.name_en.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
-
-  const sortedServices = [...filteredServices].sort((a, b) => {
+  const sortedServices = [...services].sort((a, b) => {
     if (sortField === "is_active") {
-      return sortDirection === "asc" ? Number(a.is_active) - Number(b.is_active) : Number(b.is_active) - Number(a.is_active);
+      return sortDirection === "asc" 
+        ? Number(a.is_active) - Number(b.is_active) 
+        : Number(b.is_active) - Number(a.is_active);
     }
     if (sortField === "price") {
       return sortDirection === "asc" ? a.price - b.price : b.price - a.price;
@@ -107,6 +133,11 @@ export default function ServicePage() {
     if (sortField === "duration") {
       return sortDirection === "asc" ? a.duration - b.duration : b.duration - a.duration;
     }
+    // if (sortField === "percent") {
+    //   const aPercent = typeof a.percent === 'string' ? parseFloat(a.percent) : a.percent;
+    //   const bPercent = typeof b.percent === 'string' ? parseFloat(b.percent) : b.percent;
+    //   return sortDirection === "asc" ? aPercent - bPercent : bPercent - aPercent;
+    // }
   
     const aField = a[sortField] ?? "";
     const bField = b[sortField] ?? "";
@@ -116,10 +147,10 @@ export default function ServicePage() {
   });
 
   const handleSelectAll = () => {
-    if (selectedServices.length === filteredServices.length) {
+    if (selectedServices.length === services.length && services.length > 0) {
       setSelectedServices([]);
     } else {
-      setSelectedServices(filteredServices.map((service) => service.id));
+      setSelectedServices(services.map((service) => service.id));
     }
   };
 
@@ -132,73 +163,115 @@ export default function ServicePage() {
   };
 
   const handleAddService = async (service: Omit<Service, "id" | "created_at" | "updated_at">) => {
-    const createdService = await createService(service);
-    setServices((prev) => [
-      ...prev,
-      {
-        ...createdService,
-        description_uz: createdService.description_uz ?? "",
-        description_ru: createdService.description_ru ?? "",
-        description_en: createdService.description_en ?? "",
-        percent: createdService.percent,
-      },
-    ]);
+    const payload = {
+      name: service.name_en || service.name_uz || service.name_ru || "",
+      name_uz: service.name_uz,
+      name_ru: service.name_ru,
+      name_en: service.name_en,
+      description: service.description_en || service.description_uz || service.description_ru || "",
+      description_uz: service.description_uz,
+      description_ru: service.description_ru,
+      description_en: service.description_en,
+      duration: service.duration,
+      min: service.min,
+      max: service.max,
+      price: service.price,
+      site_id: service.site_id,
+      category: service.category,
+      api: service.api,
+      is_active: service.is_active,
+      percent: typeof service.percent === 'string' ? parseFloat(service.percent) || 0 : service.percent || 0,
+      auto_update: service.auto_update,
+    };
+
+    await createService(payload as any);
+    await fetchServices();
     setCurrentPage(1);
   };
 
   const handleUpdateService = async (service: Service) => {
-    const updatedService = await updateService(service.id, service);
-    setServices((prev) =>
-      prev.map((s) =>
-        s.id === updatedService.id
-          ? {
-              ...updatedService,
-              description_uz: updatedService.description_uz ?? "",
-              description_ru: updatedService.description_ru ?? "",
-              description_en: updatedService.description_en ?? "",
-              percentage: updatedService.percent,
-            }
-          : s,
-      ),
-    );
+    const payload = {
+      name: service.name_en || service.name_uz || service.name_ru || "",
+      name_uz: service.name_uz,
+      name_ru: service.name_ru,
+      name_en: service.name_en,
+      description: service.description_en || service.description_uz || service.description_ru || "",
+      description_uz: service.description_uz,
+      description_ru: service.description_ru,
+      description_en: service.description_en,
+      duration: service.duration,
+      min: service.min,
+      max: service.max,
+      price: service.price,
+      site_id: service.site_id,
+      category: service.category,
+      api: service.api,
+      is_active: service.is_active,
+      percent: typeof service.percent === 'string' ? parseFloat(service.percent) || 0 : service.percent || 0,
+      auto_update: service.auto_update,
+    };
+
+    await updateService(service.id, payload as any);
+    await fetchServices();
   };
 
   const handleDeleteService = async () => {
     if (serviceToDelete === null) return;
-    await deleteService(serviceToDelete);
-    setServices((prev) => prev.filter((service) => service.id !== serviceToDelete));
-    setServiceToDelete(null);
-    setDeleteDialogOpen(false);
-    if (services.length === 1 && currentPage > 1) {
-      setCurrentPage((prev) => prev - 1);
+    
+    try {
+      await deleteService(serviceToDelete);
+      await fetchServices();
+      setServiceToDelete(null);
+      setDeleteDialogOpen(false);
+      
+      if (services.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    } catch (err) {
+      setError((err as { message?: string }).message || "Xizmatni o'chirishda xato yuz berdi");
     }
   };
 
-  const handleActivate = () => {
-    setServices((prev) =>
-      prev.map((service) =>
-        selectedServices.includes(service.id)
-          ? { ...service, is_active: true, updated_at: new Date().toISOString() }
-          : service,
-      ),
-    );
-    setSelectedServices([]);
+  const handleActivate = async () => {
+    try {
+      for (const id of selectedServices) {
+        const service = services.find(s => s.id === id);
+        if (service) {
+          await updateService(id, { is_active: true });
+        }
+      }
+      await fetchServices();
+      setSelectedServices([]);
+    } catch (err) {
+      setError((err as { message?: string }).message || "Xizmatlarni faollashtishda xato yuz berdi");
+    }
   };
 
-  const handleDeactivate = () => {
-    setServices((prev) =>
-      prev.map((service) =>
-        selectedServices.includes(service.id)
-          ? { ...service, is_active: false, updated_at: new Date().toISOString() }
-          : service,
-      ),
-    );
-    setSelectedServices([]);
+  const handleDeactivate = async () => {
+    try {
+      for (const id of selectedServices) {
+        const service = services.find(s => s.id === id);
+        if (service) {
+          await updateService(id, { is_active: false });
+        }
+      }
+      await fetchServices();
+      setSelectedServices([]);
+    } catch (err) {
+      setError((err as { message?: string }).message || "Xizmatlarni o'chirishda xato yuz berdi");
+    }
   };
 
-  const handleBulkDelete = () => {
-    setServices((prev) => prev.filter((service) => !selectedServices.includes(service.id)));
-    setSelectedServices([]);
+  const handleBulkDelete = async () => {
+    try {
+      for (const id of selectedServices) {
+        await deleteService(id);
+      }
+      await fetchServices();
+      setSelectedServices([]);
+    } catch (err) {
+      setError((err as { message?: string }).message || "Xizmatlarni o'chirishda xato yuz berdi");
+    }
   };
 
   const handleFilterChange = ({
@@ -219,6 +292,7 @@ export default function ServicePage() {
     setFilterPriceMin(priceMin);
     setFilterPriceMax(priceMax);
     setFilterApiId(apiId);
+    setCurrentPage(1);
   };
 
   const resetFilters = () => {
@@ -228,116 +302,97 @@ export default function ServicePage() {
     setFilterPriceMax("");
     setSearchQuery("");
     setFilterApiId("all");
+    setCurrentPage(1);
   };
 
-  if (loading) {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
+  if (loading && services.length === 0) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <main className="flex-1 p-4 md:p-10">
-          <div className="mx-auto max-w-7xl flex items-center justify-center min-h-[90vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        </main>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  if (error) {
-    return <div className="text-red-500">{error}</div>;
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Services</h1>
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard/multiservice">
-            <Button variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Multi services
-            </Button>
-          </Link>
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Service
-          </Button>
+  if (error && services.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={() => fetchServices()}>Qayta urinish</Button>
         </div>
       </div>
+    );
+  }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Manage Services</CardTitle>
-          <CardDescription>Create, edit, and manage services for your customers.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search services..."
-                  className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" onClick={() => setFilterDialogOpen(true)}>
-                <Filter className="mr-2 h-4 w-4" />
-                Filters
-                {(filterCategory !== "all" ||
-                  filterActive !== "all" ||
-                  filterPriceMin !== "" ||
-                  filterPriceMax !== "" ||
-                  filterApiId !== "all") && <span className="ml-1 rounded-full bg-primary w-2 h-2"></span>}
-              </Button>
-            </div>
-          </div>
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
 
-          <ServiceTable
-            services={sortedServices}
-            categories={categories}
-            apis={apis}
-            selectedServices={selectedServices}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onSelectService={handleSelectService}
-            onSelectAll={handleSelectAll}
-            onEdit={(service) => {
-              setEditService(service);
-              setEditDialogOpen(true);
-            }}
-            onDelete={(id) => {
-              setServiceToDelete(id);
-              setDeleteDialogOpen(true);
-            }}
-            onActivate={handleActivate}
-            onDeactivate={handleDeactivate}
-            onBulkDelete={handleBulkDelete}
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Services</h1>
+          <p className="text-muted-foreground">Manage your services and their details.</p>
+        </div>
+        <Button onClick={() => setAddDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Service
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search services by name..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="pl-10"
           />
+        </div>
+        <Button variant="outline" onClick={() => setFilterDialogOpen(true)}>
+          <Filter className="mr-2 h-4 w-4" />
+          Filters
+        </Button>
+      </div>
 
-          <div className="mt-4">
-            <ServicePagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(totalCount / itemsPerPage)}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
-      <ServiceFilterDialog
-        open={filterDialogOpen}
-        onOpenChange={setFilterDialogOpen}
-        filterCategory={filterCategory}
-        filterActive={filterActive}
-        filterPriceMin={filterPriceMin}
-        filterPriceMax={filterPriceMax}
-        filterApiId={filterApiId}
+      <ServiceTable
+        services={sortedServices}
         categories={categories}
         apis={apis}
-        onFilterChange={handleFilterChange}
-        onResetFilters={resetFilters}
+        selectedServices={selectedServices}
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+        onSelectService={handleSelectService}
+        onSelectAll={handleSelectAll}
+        onEdit={(service) => {
+          setEditService(service);
+          setEditDialogOpen(true);
+        }}
+        onDelete={(id) => {
+          setServiceToDelete(id);
+          setDeleteDialogOpen(true);
+        }}
+        onActivate={handleActivate}
+        onDeactivate={handleDeactivate}
+        onBulkDelete={handleBulkDelete}
+      />
+
+      <ServicePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
       />
 
       <ServiceAddDialog
@@ -355,6 +410,20 @@ export default function ServicePage() {
         categories={categories}
         apis={apis}
         onUpdateService={handleUpdateService}
+      />
+
+      <ServiceFilterDialog
+        open={filterDialogOpen}
+        onOpenChange={setFilterDialogOpen}
+        filterCategory={filterCategory}
+        filterActive={filterActive}
+        filterPriceMin={filterPriceMin}
+        filterPriceMax={filterPriceMax}
+        filterApiId={filterApiId}
+        categories={categories}
+        apis={apis}
+        onFilterChange={handleFilterChange}
+        onResetFilters={resetFilters}
       />
 
       <ServiceDeleteDialog
