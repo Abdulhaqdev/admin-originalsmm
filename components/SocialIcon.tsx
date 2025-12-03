@@ -14,12 +14,11 @@ import {
 } from 'react-icons/fa';
 
 interface SocialIconProps {
-  iconName?: string; // `iconName` ixtiyoriy bo‘lishi uchun `?` qo‘shildi
+  iconName?: string; 
   className?: string;
 }
 
 const SocialIcon: React.FC<SocialIconProps> = ({ iconName, className }) => {
-  // Agar iconName undefined yoki bo‘sh bo‘lsa, hech narsa qaytarmaymiz
   if (!iconName) {
     return null;
   }

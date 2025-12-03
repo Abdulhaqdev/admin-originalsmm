@@ -8,7 +8,7 @@ import { ServiceTable } from "@/components/ServiceTable";
 import { ServiceAddDialog } from "@/components/ServiceAddDialog";
 import { ServiceEditDialog } from "@/components/ServiceEditDialog";
 import { ServiceFilterDialog } from "@/components/ServiceFilterDialog";
-
+import { ServiceDeleteDialog } from "@/components/ServiceDeleteDialog";
 import {
   getCategories,
   getServices,
@@ -18,8 +18,6 @@ import {
   getApis,
 } from "@/lib/apiservice";
 import { Service, Category, Api } from "@/types";
-import { ServicePagination } from "@/components/ServicePagination";
-import { ServiceDeleteDialog } from "@/components/ServiceDeleteDialog";
 
 export default function ServicePage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -32,8 +30,6 @@ export default function ServicePage() {
   const [serviceToDelete, setServiceToDelete] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
   const [editService, setEditService] = useState<Service | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -44,13 +40,11 @@ export default function ServicePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filterApiId, setFilterApiId] = useState<number | "all">("all");
-  const itemsPerPage = 10;
 
   const fetchServices = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const offset = (currentPage - 1) * itemsPerPage;
       
       const filters: any = {};
       if (filterCategory !== "all") filters.category = filterCategory;
@@ -60,9 +54,9 @@ export default function ServicePage() {
       if (filterPriceMax !== "") filters.price_max = filterPriceMax;
       if (searchQuery) filters.search = searchQuery;
       
-      const servicesData = await getServices(itemsPerPage, offset, filters);
+      const servicesData = await getServices(filters);
       
-      const normalizedServices = servicesData.results.map((svc) => ({
+      const normalizedServices = servicesData.map((svc) => ({
         ...svc,
         description_uz: svc.description_uz ?? "",
         description_ru: svc.description_ru ?? "",
@@ -71,13 +65,12 @@ export default function ServicePage() {
       }));
       
       setServices(normalizedServices);
-      setTotalCount(servicesData.count);
     } catch (err) {
       setError((err as { message?: string }).message || "Ma'lumotlarni yuklashda xato yuz berdi");
     } finally {
       setLoading(false);
     }
-  }, [currentPage, filterCategory, filterApiId, filterActive, filterPriceMin, filterPriceMax, searchQuery]);
+  }, [filterCategory, filterApiId, filterActive, filterPriceMin, filterPriceMax, searchQuery]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -133,11 +126,6 @@ export default function ServicePage() {
     if (sortField === "duration") {
       return sortDirection === "asc" ? a.duration - b.duration : b.duration - a.duration;
     }
-    // if (sortField === "percent") {
-    //   const aPercent = typeof a.percent === 'string' ? parseFloat(a.percent) : a.percent;
-    //   const bPercent = typeof b.percent === 'string' ? parseFloat(b.percent) : b.percent;
-    //   return sortDirection === "asc" ? aPercent - bPercent : bPercent - aPercent;
-    // }
   
     const aField = a[sortField] ?? "";
     const bField = b[sortField] ?? "";
@@ -186,7 +174,6 @@ export default function ServicePage() {
 
     await createService(payload as any);
     await fetchServices();
-    setCurrentPage(1);
   };
 
   const handleUpdateService = async (service: Service) => {
@@ -223,10 +210,6 @@ export default function ServicePage() {
       await fetchServices();
       setServiceToDelete(null);
       setDeleteDialogOpen(false);
-      
-      if (services.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
-      }
     } catch (err) {
       setError((err as { message?: string }).message || "Xizmatni o'chirishda xato yuz berdi");
     }
@@ -235,10 +218,7 @@ export default function ServicePage() {
   const handleActivate = async () => {
     try {
       for (const id of selectedServices) {
-        const service = services.find(s => s.id === id);
-        if (service) {
-          await updateService(id, { is_active: true });
-        }
+        await updateService(id, { is_active: true });
       }
       await fetchServices();
       setSelectedServices([]);
@@ -250,10 +230,7 @@ export default function ServicePage() {
   const handleDeactivate = async () => {
     try {
       for (const id of selectedServices) {
-        const service = services.find(s => s.id === id);
-        if (service) {
-          await updateService(id, { is_active: false });
-        }
+        await updateService(id, { is_active: false });
       }
       await fetchServices();
       setSelectedServices([]);
@@ -292,7 +269,6 @@ export default function ServicePage() {
     setFilterPriceMin(priceMin);
     setFilterPriceMax(priceMax);
     setFilterApiId(apiId);
-    setCurrentPage(1);
   };
 
   const resetFilters = () => {
@@ -302,12 +278,10 @@ export default function ServicePage() {
     setFilterPriceMax("");
     setSearchQuery("");
     setFilterApiId("all");
-    setCurrentPage(1);
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1);
   };
 
   if (loading && services.length === 0) {
@@ -328,8 +302,6 @@ export default function ServicePage() {
       </div>
     );
   }
-
-  const totalPages = Math.ceil(totalCount / itemsPerPage);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -387,12 +359,6 @@ export default function ServicePage() {
         onActivate={handleActivate}
         onDeactivate={handleDeactivate}
         onBulkDelete={handleBulkDelete}
-      />
-
-      <ServicePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
       />
 
       <ServiceAddDialog

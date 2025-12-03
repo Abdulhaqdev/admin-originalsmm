@@ -175,10 +175,9 @@ export const getOrders = async (limit: number = 10, offset: number = 0): Promise
 // -------------------- SERVICE RELATED -------------------- //
 
 
+// ...existing code...
 
 export const getServices = async (
-  limit: number = 10, 
-  offset: number = 0,
   filters?: {
     category?: number;
     api?: number;
@@ -187,9 +186,9 @@ export const getServices = async (
     price_max?: number;
     search?: string;
   }
-): Promise<PaginatedResponse<Service>> => {
+): Promise<Service[]> => {
   try {
-    const params: any = { limit, offset };
+    const params: any = {};
     
     if (filters?.category) params.category = filters.category;
     if (filters?.api) params.api = filters.api;
@@ -198,7 +197,7 @@ export const getServices = async (
     if (filters?.price_max !== undefined) params.price_max = filters.price_max;
     if (filters?.search) params.search = filters.search;
     
-    const response = await apiClient.get<PaginatedResponse<Service>>("/services/", {
+    const response = await apiClient.get<Service[]>("/services/", {
       params,
     });
     return response.data;
@@ -206,6 +205,8 @@ export const getServices = async (
     return handleError(error as AxiosError<ErrorResponse>);
   }
 };
+
+// ...existing code...
 
 
 export const createService = async (
