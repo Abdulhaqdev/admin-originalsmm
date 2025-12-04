@@ -8,9 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/ui/modal";
 import { DurationInput } from "@/components/ui/duration-input";
 import { FormMessage } from "@/components/ui/form";
-import { getInfoByService } from "@/lib/apiservice";
+import { getInfoByService, translateText } from "@/lib/apiservice";
 import { Api, Category, FormErrors, Service } from "@/types";
-import { Download } from "lucide-react";
+import { Download, Languages } from "lucide-react";
 
 interface ServiceAddDialogProps {
   open: boolean;
@@ -41,6 +41,7 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [fetchingServiceInfo, setFetchingServiceInfo] = useState<boolean>(false);
+  const [translating, setTranslating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isApiFetched, setIsApiFetched] = useState<boolean>(false);
 
@@ -117,7 +118,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     return Object.keys(errors).length === 0;
   }, [newService]);
 
-  // Fetch service info from API
   const fetchServiceInfo = useCallback(async () => {
     if (!newService.site_id || !newService.api) {
       setError("Please select both Site ID and API");
@@ -151,6 +151,33 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
     }
   }, [newService.site_id, newService.api]);
 
+  const handleTranslate = useCallback(async () => {
+    if (!newService.description_en) {
+      setError("Please enter English description first");
+      return;
+    }
+
+    try {
+      setTranslating(true);
+      setError(null);
+      const translated = await translateText(newService.description_en);
+      setNewService((prev) => ({
+        ...prev,
+        description_en: translated.text,
+        description_ru: translated.text_ru,
+        description_uz: translated.text_uz,
+      }));
+      setFormErrors((prev) => {
+        const { description_uz, description_ru, description_en, ...rest } = prev;
+        return rest;
+      });
+    } catch (err) {
+      setError((err as { message?: string }).message || "Failed to translate description");
+    } finally {
+      setTranslating(false);
+    }
+  }, [newService.description_en]);
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
     try {
@@ -176,7 +203,6 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
       setFormErrors({});
       setError(null);
       setIsApiFetched(false);
-      // clear saved draft after successful submit
       try { localStorage.removeItem("service_draft"); } catch {}
       onOpenChange(false);
     } catch (err) {
@@ -215,8 +241,8 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={fetchingServiceInfo}>
-            {fetchingServiceInfo ? "Fetching..." : "Add Service"}
+          <Button onClick={handleSubmit} disabled={fetchingServiceInfo || translating}>
+            {fetchingServiceInfo || translating ? "Processing..." : "Add Service"}
           </Button>
         </>
       }
@@ -382,6 +408,16 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
           />
           {formErrors.description_en && <FormMessage>{formErrors.description_en}</FormMessage>}
         </div>
+
+        <Button 
+          onClick={handleTranslate} 
+          disabled={translating || !newService.description_en}
+          className="w-full"
+          variant="secondary"
+        >
+          <Languages className="mr-2 h-4 w-4" />
+          {translating ? "Translating..." : "Translate Description"}
+        </Button>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">

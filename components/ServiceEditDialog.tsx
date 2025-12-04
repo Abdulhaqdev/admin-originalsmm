@@ -8,9 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/ui/modal";
 import { DurationInput } from "@/components/ui/duration-input";
 import { FormMessage } from "@/components/ui/form";
-import { getInfoByService } from "@/lib/apiservice";
+import { getInfoByService, translateText } from "@/lib/apiservice";
 import { Api, Category, FormErrors, Service } from "@/types";
-import { Download } from "lucide-react";
+import { Download, Languages } from "lucide-react";
 
 interface ServiceEditDialogProps {
   open: boolean;
@@ -32,12 +32,15 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
   const [editService, setEditService] = useState<Service | null>(service);
   const [editFormErrors, setEditFormErrors] = useState<FormErrors>({});
   const [fetchingServiceInfo, setFetchingServiceInfo] = useState<boolean>(false);
+  const [translating, setTranslating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isApiFetched, setIsApiFetched] = useState<boolean>(false);
 
   useEffect(() => {
     setEditService(service);
     setIsApiFetched(false);
+    setError(null);
+    setEditFormErrors({});
   }, [service]);
 
   useEffect(() => {
@@ -79,7 +82,6 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
     return Object.keys(errors).length === 0;
   }, [editService]);
 
-  // Fetch service info from API
   const fetchServiceInfo = useCallback(async () => {
     if (!editService || !editService.site_id || !editService.api) {
       setError("Please select both Site ID and API");
@@ -92,14 +94,16 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
       const serviceInfo = await getInfoByService(editService.site_id, editService.api);
       setEditService((prev) => prev && ({
         ...prev,
-        name_en: serviceInfo.name,
+        name_uz: serviceInfo.name_uz,
+        name_ru: serviceInfo.name_ru,
+        name_en: serviceInfo.name_en,
         min: serviceInfo.min_quantity,
         max: serviceInfo.max_quantity,
         price: serviceInfo.price,
         percent: serviceInfo.percent,
       }));
       setEditFormErrors((prev) => {
-        const { min, max, price, percentage, name_en, ...rest } = prev;
+        const { min, max, price, percentage, name_en, name_uz, name_ru, ...rest } = prev;
         return rest;
       });
       setIsApiFetched(true);
@@ -110,6 +114,33 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
       setFetchingServiceInfo(false);
     }
   }, [editService?.site_id, editService?.api]);
+
+  const handleTranslate = useCallback(async () => {
+    if (!editService || !editService.description_en) {
+      setError("Please enter English description first");
+      return;
+    }
+
+    try {
+      setTranslating(true);
+      setError(null);
+      const translated = await translateText(editService.description_en);
+      setEditService((prev) => prev && ({
+        ...prev,
+        description_en: translated.text,
+        description_ru: translated.text_ru,
+        description_uz: translated.text_uz,
+      }));
+      setEditFormErrors((prev) => {
+        const { description_uz, description_ru, description_en, ...rest } = prev;
+        return rest;
+      });
+    } catch (err) {
+      setError((err as { message?: string }).message || "Failed to translate description");
+    } finally {
+      setTranslating(false);
+    }
+  }, [editService?.description_en]);
 
   const handleSubmit = async () => {
     if (!editService || !validateEditForm()) return;
@@ -159,8 +190,8 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={fetchingServiceInfo}>
-            {fetchingServiceInfo ? "Fetching..." : "Update Service"}
+          <Button onClick={handleSubmit} disabled={fetchingServiceInfo || translating}>
+            {fetchingServiceInfo || translating ? "Processing..." : "Update Service"}
           </Button>
         </>
       }
@@ -201,6 +232,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
             onChange={(e) => setEditService({ ...editService, site_id: Number.parseInt(e.target.value) || 0 })}
             onBlur={(e) => handleNumberInputBlur(e, "site_id")}
             required
+            placeholder="Enter Site ID"
           />
           {editFormErrors.site_id && <FormMessage>{editFormErrors.site_id}</FormMessage>}
         </div>
@@ -243,6 +275,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           </Label>
           <Input
             id="edit-name_uz"
+            type="text"
             value={editService.name_uz}
             onChange={(e) => setEditService({ ...editService, name_uz: e.target.value })}
             required
@@ -256,6 +289,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           </Label>
           <Input
             id="edit-name_ru"
+            type="text"
             value={editService.name_ru}
             onChange={(e) => setEditService({ ...editService, name_ru: e.target.value })}
             required
@@ -269,6 +303,7 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           </Label>
           <Input
             id="edit-name_en"
+            type="text"
             value={editService.name_en}
             onChange={(e) => setEditService({ ...editService, name_en: e.target.value })}
             required
@@ -322,6 +357,16 @@ export const ServiceEditDialog: React.FC<ServiceEditDialogProps> = ({
           />
           {editFormErrors.description_en && <FormMessage>{editFormErrors.description_en}</FormMessage>}
         </div>
+
+        <Button 
+          onClick={handleTranslate} 
+          disabled={translating || !editService.description_en}
+          className="w-full"
+          variant="secondary"
+        >
+          <Languages className="mr-2 h-4 w-4" />
+          {translating ? "Translating..." : "Translate Description"}
+        </Button>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">

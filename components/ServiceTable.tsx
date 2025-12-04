@@ -58,7 +58,16 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
 
   return (
     <div className="rounded-md border">
+          {selectedServices.length > 0 && (
+        <div className="flex items-center w-full justify-between  p-4 ">
+          <span className="text-sm text-muted-foreground">{selectedServices.length} selected</span>
+          <Button variant="destructive" size="sm" onClick={onBulkDelete}>
+            Delete
+          </Button>
+        </div>
+      )}
       <Table>
+        
         <TableHeader>
           <TableRow>
             <TableHead className="w-12">
@@ -160,12 +169,6 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
       {selectedServices.length > 0 && (
         <div className="flex items-center gap-2 mt-4">
           <span className="text-sm text-muted-foreground">{selectedServices.length} selected</span>
-          <Button variant="outline" size="sm" onClick={onActivate}>
-            Activate
-          </Button>
-          <Button variant="outline" size="sm" onClick={onDeactivate}>
-            Deactivate
-          </Button>
           <Button variant="destructive" size="sm" onClick={onBulkDelete}>
             Delete
           </Button>

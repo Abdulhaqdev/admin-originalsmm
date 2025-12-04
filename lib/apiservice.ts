@@ -565,9 +565,29 @@ export const getInfoByService = async (site_id: number, api_id: number): Promise
       min_quantity: data.min || 0,
       max_quantity: data.max || 0,
       price: data.price , 
-      percent: data.percent , // Default percentage if not provided
+      percent: data.percent , 
     };
   } catch (error) {
     return handleError(   "No data returned from the API" as unknown as AxiosError<ErrorResponse>);
+  }
+};
+
+
+interface TranslateRequest {
+  text: string;
+}
+
+interface TranslateResponse {
+  text: string;
+  text_ru: string;
+  text_uz: string;
+}
+
+export const translateText = async (text: string): Promise<TranslateResponse> => {
+  try {
+    const response = await apiClient.post<TranslateResponse>("/translate/", { text });
+    return response.data;
+  } catch (error) {
+    return handleError(error as AxiosError<ErrorResponse>);
   }
 };
