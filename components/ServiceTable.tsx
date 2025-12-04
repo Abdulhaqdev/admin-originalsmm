@@ -98,6 +98,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
               </div>
             </TableHead>
             <TableHead>API</TableHead>
+            <TableHead> Auto update</TableHead>
             <TableHead className="cursor-pointer" onClick={() => onSort("is_active")}>
               <div className="flex items-center gap-1">
                 Active
@@ -124,6 +125,7 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
               <TableCell>{`${service.min}-${service.max}`}</TableCell>
               <TableCell>{formatDuration(service.duration)}</TableCell>
               <TableCell>{getApiName(service.api)}</TableCell>
+              <TableCell>{service.auto_update ? "Yes" : "No"}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
                   <div

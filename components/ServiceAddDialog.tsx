@@ -130,7 +130,9 @@ export const ServiceAddDialog: React.FC<ServiceAddDialogProps> = ({ open, onOpen
       const serviceInfo = await getInfoByService(newService.site_id, newService.api);
       setNewService((prev) => ({
         ...prev,
-        name_en: serviceInfo.name,
+        name_uz: serviceInfo.name_uz,
+        name_ru: serviceInfo.name_ru,
+        name_en: serviceInfo.name_en,
         min: serviceInfo.min_quantity,
         max: serviceInfo.max_quantity,
         price: serviceInfo.price,

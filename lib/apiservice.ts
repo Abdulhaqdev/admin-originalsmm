@@ -535,7 +535,9 @@ interface ErrorResponse {
 
 // -------------------- SERVICE INFO BY SERVICE -------------------- //
 interface ServiceInfo {
-  name: string;
+  name_uz: string;
+  name_ru: string;
+  name_en: string;
   min_quantity: number;
   max_quantity: number;
   price: number;
@@ -556,7 +558,10 @@ export const getInfoByService = async (site_id: number, api_id: number): Promise
 
     const data = response.data;
     return {
-      name: data.name || "",
+      name_uz: data.name_uz || "",
+      name_ru: data.name_ru || "",
+      name_en: data.name_en || "",
+
       min_quantity: data.min || 0,
       max_quantity: data.max || 0,
       price: data.price , 
