@@ -546,7 +546,7 @@ interface ServiceInfo {
 
 export const getInfoByService = async (site_id: number, api_id: number): Promise<ServiceInfo> => {
   try {
-    const response = await axios.get(`https://api.originalsmm.uz/api/get_info_by_service/${site_id}/${api_id}`, {
+    const response = await axios.get(`https://api.orginal-smm.com/api/get_info_by_service/${site_id}/${api_id}`, {
       headers: {
         "Content-Type": "application/json",
       },
