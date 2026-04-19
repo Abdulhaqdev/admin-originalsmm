@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Filter, Search } from "lucide-react";
@@ -9,209 +9,99 @@ import { ServiceAddDialog } from "@/components/ServiceAddDialog";
 import { ServiceEditDialog } from "@/components/ServiceEditDialog";
 import { ServiceFilterDialog } from "@/components/ServiceFilterDialog";
 import { ServiceDeleteDialog } from "@/components/ServiceDeleteDialog";
-import {
-  getCategories,
-  getServices,
-  createService,
-  updateService,
-  deleteService,
-  getApis,
-} from "@/lib/apiservice";
-import { Service, Category, Api } from "@/types";
+import { createService, updateService, deleteService } from "@/lib/apiservice";
+import { getErrorMessage } from "@/lib/error-utils";
+import { useServicesAdmin } from "@/hooks/use-services-admin";
+import type { Service } from "@/types";
 
 export default function ServicePage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [apis, setApis] = useState<Api[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+  const {
+    categories,
+    apis,
+    sortedServices,
+    loading,
+    error,
+    setError,
+    fetchServices,
+    filterCategory,
+    setFilterCategory,
+    filterActive,
+    setFilterActive,
+    filterPriceMin,
+    setFilterPriceMin,
+    filterPriceMax,
+    setFilterPriceMax,
+    searchQuery,
+    setSearchQuery,
+    filterApiId,
+    setFilterApiId,
+    sortField,
+    sortDirection,
+    handleSort,
+  } = useServicesAdmin();
+
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
-  const [sortField, setSortField] = useState<keyof Service>("name_en");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [editService, setEditService] = useState<Service | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<number | "all">("all");
-  const [filterActive, setFilterActive] = useState<boolean | "all">("all");
-  const [filterPriceMin, setFilterPriceMin] = useState<number | "">("");
-  const [filterPriceMax, setFilterPriceMax] = useState<number | "">("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
-  const [filterApiId, setFilterApiId] = useState<number | "all">("all");
-
-  const fetchServices = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const filters: any = {};
-      if (filterCategory !== "all") filters.category = filterCategory;
-      if (filterApiId !== "all") filters.api = filterApiId;
-      if (filterActive !== "all") filters.is_active = filterActive;
-      if (filterPriceMin !== "") filters.price_min = filterPriceMin;
-      if (filterPriceMax !== "") filters.price_max = filterPriceMax;
-      if (searchQuery) filters.search = searchQuery;
-      
-      const servicesData = await getServices(filters);
-      
-      const normalizedServices = servicesData.map((svc) => ({
-        ...svc,
-        description_uz: svc.description_uz ?? "",
-        description_ru: svc.description_ru ?? "",
-        description_en: svc.description_en ?? "",
-        percentage: svc.percent !== undefined ? String(svc.percent) : "50",
-      }));
-      
-      setServices(normalizedServices);
-    } catch (err) {
-      setError((err as { message?: string }).message || "Ma'lumotlarni yuklashda xato yuz berdi");
-    } finally {
-      setLoading(false);
-    }
-  }, [filterCategory, filterApiId, filterActive, filterPriceMin, filterPriceMax, searchQuery]);
-
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setLoading(true);
-        const [categoriesData, apisData] = await Promise.all([
-          getCategories(100, 0),
-          getApis(100, 0),
-        ]);
-        
-        const normalizedCategories = categoriesData.results.map((cat) => ({
-          ...cat,
-          description_uz: cat.description_uz ?? "",
-          description_ru: cat.description_ru ?? "",
-          description_en: cat.description_en ?? "",
-          icon: cat.icon ?? "",
-        }));
-        
-        setCategories(normalizedCategories);
-        setApis(apisData.results);
-      } catch (err) {
-        setError((err as { message?: string }).message || "Ma'lumotlarni yuklashda xato yuz berdi");
-      }
-    };
-
-    fetchInitialData();
-  }, []);
-
-  useEffect(() => {
-    if (categories.length > 0 && apis.length > 0) {
-      fetchServices();
-    }
-  }, [categories, apis, fetchServices]);
-
-  const handleSort = (field: keyof Service) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const sortedServices = [...services].sort((a, b) => {
-    if (sortField === "is_active") {
-      return sortDirection === "asc" 
-        ? Number(a.is_active) - Number(b.is_active) 
-        : Number(b.is_active) - Number(a.is_active);
-    }
-    if (sortField === "price") {
-      return sortDirection === "asc" ? a.price - b.price : b.price - a.price;
-    }
-    if (sortField === "duration") {
-      return sortDirection === "asc" ? a.duration - b.duration : b.duration - a.duration;
-    }
-  
-    const aField = a[sortField] ?? "";
-    const bField = b[sortField] ?? "";
-    if (aField < bField) return sortDirection === "asc" ? -1 : 1;
-    if (aField > bField) return sortDirection === "asc" ? 1 : -1;
-    return 0;
-  });
 
   const handleSelectAll = () => {
-    if (selectedServices.length === services.length && services.length > 0) {
+    if (selectedServices.length === sortedServices.length && sortedServices.length > 0) {
       setSelectedServices([]);
     } else {
-      setSelectedServices(services.map((service) => service.id));
+      setSelectedServices(sortedServices.map((service) => service.id));
     }
   };
 
   const handleSelectService = (id: number) => {
-    if (selectedServices.includes(id)) {
-      setSelectedServices(selectedServices.filter((serviceId) => serviceId !== id));
-    } else {
-      setSelectedServices([...selectedServices, id]);
-    }
+    setSelectedServices((prev) =>
+      prev.includes(id) ? prev.filter((serviceId) => serviceId !== id) : [...prev, id],
+    );
   };
 
-  const handleAddService = async (service: Omit<Service, "id" | "created_at" | "updated_at">) => {
-    const payload = {
-      name: service.name_en || service.name_uz || service.name_ru || "",
-      name_uz: service.name_uz,
-      name_ru: service.name_ru,
-      name_en: service.name_en,
-      description: service.description_en || service.description_uz || service.description_ru || "",
-      description_uz: service.description_uz,
-      description_ru: service.description_ru,
-      description_en: service.description_en,
-      duration: service.duration,
-      min: service.min,
-      max: service.max,
-      price: service.price,
-      site_id: service.site_id,
-      category: service.category,
-      api: service.api,
-      is_active: service.is_active,
-      percent: typeof service.percent === 'string' ? parseFloat(service.percent) || 0 : service.percent || 0,
-      auto_update: service.auto_update,
-    };
+  const buildPayload = (service: Omit<Service, "id" | "created_at" | "updated_at"> | Service) => ({
+    name: service.name_en || service.name_uz || service.name_ru || "",
+    name_uz: service.name_uz,
+    name_ru: service.name_ru,
+    name_en: service.name_en,
+    description: service.description_en || service.description_uz || service.description_ru || "",
+    description_uz: service.description_uz,
+    description_ru: service.description_ru,
+    description_en: service.description_en,
+    duration: service.duration,
+    min: service.min,
+    max: service.max,
+    price: service.price,
+    site_id: service.site_id,
+    category: service.category,
+    api: service.api,
+    is_active: service.is_active,
+    percent: typeof service.percent === "string" ? parseFloat(service.percent) || 0 : service.percent || 0,
+    auto_update: service.auto_update,
+  });
 
-    await createService(payload as any);
+  const handleAddService = async (service: Omit<Service, "id" | "created_at" | "updated_at">) => {
+    await createService(buildPayload(service) as Parameters<typeof createService>[0]);
     await fetchServices();
   };
 
   const handleUpdateService = async (service: Service) => {
-    const payload = {
-      name: service.name_en || service.name_uz || service.name_ru || "",
-      name_uz: service.name_uz,
-      name_ru: service.name_ru,
-      name_en: service.name_en,
-      description: service.description_en || service.description_uz || service.description_ru || "",
-      description_uz: service.description_uz,
-      description_ru: service.description_ru,
-      description_en: service.description_en,
-      duration: service.duration,
-      min: service.min,
-      max: service.max,
-      price: service.price,
-      site_id: service.site_id,
-      category: service.category,
-      api: service.api,
-      is_active: service.is_active,
-      percent: typeof service.percent === 'string' ? parseFloat(service.percent) || 0 : service.percent || 0,
-      auto_update: service.auto_update,
-    };
-
-    await updateService(service.id, payload as any);
+    await updateService(service.id, buildPayload(service) as Parameters<typeof updateService>[1]);
     await fetchServices();
   };
 
   const handleDeleteService = async () => {
     if (serviceToDelete === null) return;
-    
     try {
       await deleteService(serviceToDelete);
       await fetchServices();
       setServiceToDelete(null);
       setDeleteDialogOpen(false);
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmatni o'chirishda xato yuz berdi");
+      setError(getErrorMessage(err, "Xizmatni o'chirishda xato yuz berdi"));
     }
   };
 
@@ -223,7 +113,7 @@ export default function ServicePage() {
       await fetchServices();
       setSelectedServices([]);
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmatlarni faollashtishda xato yuz berdi");
+      setError(getErrorMessage(err, "Xizmatlarni faollashtirishda xato yuz berdi"));
     }
   };
 
@@ -235,7 +125,7 @@ export default function ServicePage() {
       await fetchServices();
       setSelectedServices([]);
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmatlarni o'chirishda xato yuz berdi");
+      setError(getErrorMessage(err, "Xizmatlarni o'chirishda xato yuz berdi"));
     }
   };
 
@@ -247,7 +137,7 @@ export default function ServicePage() {
       await fetchServices();
       setSelectedServices([]);
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmatlarni o'chirishda xato yuz berdi");
+      setError(getErrorMessage(err, "Xizmatlarni o'chirishda xato yuz berdi"));
     }
   };
 
@@ -284,7 +174,7 @@ export default function ServicePage() {
     setSearchQuery(e.target.value);
   };
 
-  if (loading && services.length === 0) {
+  if (loading && sortedServices.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -292,12 +182,12 @@ export default function ServicePage() {
     );
   }
 
-  if (error && services.length === 0) {
+  if (error && sortedServices.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={() => fetchServices()}>Qayta urinish</Button>
+          <Button onClick={() => void fetchServices()}>Qayta urinish</Button>
         </div>
       </div>
     );
@@ -333,9 +223,7 @@ export default function ServicePage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>
       )}
 
       <ServiceTable

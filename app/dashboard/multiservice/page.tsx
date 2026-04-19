@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { FormMessage } from "@/components/ui/form";
 import { DurationInput } from "@/components/ui/duration-input";
 import { apiClient, getApis, getCategories } from "@/lib/apiservice";
+import { getErrorMessage } from "@/lib/error-utils";
 import { Api, Category } from "@/types";
 
 interface ServiceForm {
@@ -76,7 +77,7 @@ export default function MultiServiceCreatePage() {
         setCategories(normalizedCategories);
         setApis(apisData.results);
       } catch (err) {
-        setError((err as { message?: string }).message || "Ma'lumotlarni yuklashda xato yuz berdi");
+        setError(getErrorMessage(err, "Ma'lumotlarni yuklashda xato yuz berdi"));
       } finally {
         setLoading(false);
       }
@@ -98,7 +99,7 @@ export default function MultiServiceCreatePage() {
         setServices([]); // Clear existing forms when new services are fetched
         setFormErrors({});
       } catch (err) {
-        setError((err as { message?: string }).message || "Xizmatlarni yuklashda xato yuz berdi");
+        setError(getErrorMessage(err, "Xizmatlarni yuklashda xato yuz berdi"));
       } finally {
         setFetchLoading(false);
       }
@@ -228,7 +229,7 @@ export default function MultiServiceCreatePage() {
       setFormErrors({});
       setSelectedServiceId("");
     } catch (err) {
-      setError((err as { message?: string }).message || "Xizmatlarni yaratishda xato yuz berdi");
+      setError(getErrorMessage(err, "Xizmatlarni yaratishda xato yuz berdi"));
     } finally {
       setLoading(false);
     }

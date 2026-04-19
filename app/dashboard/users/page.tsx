@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Download, Search, Filter, FileText, FileSpreadsheet, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/pagination";
 import { Modal } from "@/components/ui/modal";
 import { getUsers } from "@/lib/apiservice";
+import { usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { useTableSort } from "@/hooks/use-table-sort";
 
 interface User {
   id: number;
@@ -30,93 +32,61 @@ interface User {
   username: string;
 }
 
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
-
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [sortField, setSortField] = useState<keyof User>("id");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const {
+    data: users,
+    totalCount,
+    loading,
+    error,
+    page: currentPage,
+    setPage: setCurrentPage,
+    itemsPerPage,
+  } = usePaginatedQuery(getUsers, "Foydalanuvchilarni yuklashda xato yuz berdi", 10);
+
+  const { sortField, sortDirection, handleSort } = useTableSort<keyof User>("id", "asc");
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterDialogOpen, setFilterDialogOpen] = useState<boolean>(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const itemsPerPage = 10;
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const offset = (currentPage - 1) * itemsPerPage;
-        const data = await getUsers(itemsPerPage, offset);
-        console.log(data)
-        setUsers(data.results);
-        setTotalCount(data.count);
-      } catch (err) {
-        setError((err as { message?: string }).message || "Foydalanuvchilarni yuklashda xato yuz berdi");
-      } finally {
-        setLoading(false);
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      if (
+        searchQuery &&
+        !user.first_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !user.last_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !user.email.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !user.username.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
+        return false;
       }
-    };
+      return true;
+    });
+  }, [users, searchQuery]);
 
-    fetchUsers();
-  }, [currentPage]);
+  const sortedUsers = useMemo(() => {
+    return [...filteredUsers].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
 
-  const handleSort = (field: keyof User) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
+      if (sortField === "id") {
+        return sortDirection === "asc"
+          ? (aValue as number) - (bValue as number)
+          : (bValue as number) - (aValue as number);
+      }
 
-  const filteredUsers = users.filter((user) => {
-    if (
-      searchQuery &&
-      !user.first_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !user.last_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !user.email.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !user.username.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
-      return false;
-    }
-    return true;
-  });
+      if (sortField === "balance") {
+        const aNum = parseFloat(aValue as string);
+        const bNum = parseFloat(bValue as string);
+        return sortDirection === "asc" ? aNum - bNum : bNum - aNum;
+      }
 
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    const aValue = a[sortField];
-    const bValue = b[sortField];
-
-    // Agar sortField "id" bo‘lsa, uni number sifatida taqqoslash
-    if (sortField === "id") {
-      return sortDirection === "asc" 
-        ? (aValue as number) - (bValue as number) 
-        : (bValue as number) - (aValue as number);
-    }
-
-    // Agar sortField "balance" bo‘lsa, uni string sifatida parse qilib, raqamga aylantirish
-    if (sortField === "balance") {
-      const aNum = parseFloat(aValue as string);
-      const bNum = parseFloat(bValue as string);
-      return sortDirection === "asc" ? aNum - bNum : bNum - aNum;
-    }
-
-    // Qolgan barcha maydonlar (string) uchun localeCompare ishlatamiz
-    return sortDirection === "asc" 
-      ? (aValue as string).localeCompare(bValue as string) 
-      : (bValue as string).localeCompare(aValue as string);
-  });
+      return sortDirection === "asc"
+        ? (aValue as string).localeCompare(bValue as string)
+        : (bValue as string).localeCompare(aValue as string);
+    });
+  }, [filteredUsers, sortField, sortDirection]);
 
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);

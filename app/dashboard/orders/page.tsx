@@ -35,49 +35,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getOrders, getServices } from "@/lib/apiservice";
 import { ChevronDown, ChevronUp, Eye, Filter, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useOrdersData, type OrdersPageOrder, type OrdersPageService } from "@/hooks/use-orders-data";
+import { useTableSort } from "@/hooks/use-table-sort";
 
-interface Order {
-  id: number;
-  service: Service; // Service endi obyekt
-  price: number;
-  url: string;
-  status: string;
-  user: number;
-  quantity: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  duration: number;
-  min: number;
-  max: number;
-  price: number;
-  site_id: number;
-  api: number;
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
-}
-
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
+type Order = OrdersPageOrder;
+type Service = OrdersPageService;
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [sortField, setSortField] = useState<keyof Order>("created_at");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const itemsPerPage = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const { orders, totalCount, loading, error } = useOrdersData(itemsPerPage, currentPage);
+
+  const { sortField, sortDirection, handleSort } = useTableSort<keyof Order>("created_at", "desc");
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "Pending" | "Completed" | "Cancelled"
@@ -85,42 +57,6 @@ export default function OrdersPage() {
   const [filterDialogOpen, setFilterDialogOpen] = useState<boolean>(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const itemsPerPage = 10;
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const offset = (currentPage - 1) * itemsPerPage;
-
-        const [ordersData, servicesData] = await Promise.all([
-          getOrders(itemsPerPage, offset),
-          getServices(itemsPerPage, 0),
-        ]);
-    
-        setOrders(ordersData.results);
-        setTotalCount(ordersData.count || 0);
-        console.log("Services Data:", servicesData.results);
-        const fetchedServices = servicesData.results || servicesData;
-        setServices(Array.isArray(fetchedServices) ? fetchedServices : []);
-      } catch (err) {
-        setError(
-          (err as { message?: string }).message ||
-            "Ma'lumotlarni yuklashda xato yuz berdi"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [currentPage]);
 
   const mapStatus = (
     apiStatus: string
@@ -144,16 +80,8 @@ export default function OrdersPage() {
     return service?.name || "Unknown Service";
   };
 
-  const handleSort = (field: keyof Order) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const filteredOrders = orders.filter((order) => {
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
     const displayStatus = mapStatus(order.status);
     if (filterStatus !== "all" && displayStatus !== filterStatus) {
       return false;
@@ -170,9 +98,11 @@ export default function OrdersPage() {
       return false;
     }
     return true;
-  });
+    });
+  }, [orders, filterStatus, searchQuery]);
 
-  const sortedOrders = [...filteredOrders].sort((a, b) => {
+  const sortedOrders = useMemo(() => {
+    return [...filteredOrders].sort((a, b) => {
     if (sortField === "price" || sortField === "quantity") {
       return sortDirection === "asc"
         ? a[sortField] - b[sortField]
@@ -193,7 +123,8 @@ export default function OrdersPage() {
     if (a[sortField] < b[sortField]) return sortDirection === "asc" ? -1 : 1;
     if (a[sortField] > b[sortField]) return sortDirection === "asc" ? 1 : -1;
     return 0;
-  });
+    });
+  }, [filteredOrders, sortField, sortDirection]);
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const maxVisiblePages = 5; // Ko'rsatiladigan maksimal sahifalar soni

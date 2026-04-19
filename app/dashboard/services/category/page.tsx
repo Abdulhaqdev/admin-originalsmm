@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,9 @@ import { Modal } from "@/components/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCategories, createCategory, updateCategory, deleteCategory } from "@/lib/apiservice";
 import SocialIcon from "@/components/SocialIcon";
+import { usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { getErrorMessage } from "@/lib/error-utils";
 
 interface Category {
   id: number;
@@ -33,13 +36,6 @@ interface Category {
   updated_at: string;
   is_active: boolean;
   icon?: string;
-}
-
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
 }
 
 const socialPlatforms = [
@@ -57,17 +53,23 @@ const socialPlatforms = [
 ];
 
 export default function CategoryPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [sortField, setSortField] = useState<keyof Category>("name_en");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const {
+    data: categories,
+    setData: setCategories,
+    totalCount,
+    loading,
+    error,
+    setError,
+    page: currentPage,
+    setPage: setCurrentPage,
+    itemsPerPage,
+    refetch,
+  } = usePaginatedQuery(getCategories, "Kategoriyalarni yuklashda xato yuz berdi", 10);
+
+  const { sortField, sortDirection, handleSort } = useTableSort<keyof Category>("name_en", "asc");
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalCount, setTotalCount] = useState<number>(0);
-  const itemsPerPage = 10;
   const [newCategory, setNewCategory] = useState<Omit<Category, "id" | "created_at" | "updated_at">>({
     name_uz: "",
     name_ru: "",
@@ -76,84 +78,56 @@ export default function CategoryPage() {
     description_ru: "",
     description_en: "",
     is_active: true,
-    icon: "",
   });
 
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        setLoading(true);
-        const offset = (currentPage - 1) * itemsPerPage;
-        const data: PaginatedResponse<Category> = await getCategories(itemsPerPage, offset);
-        const normalizedData = data.results.map((cat) => ({
-          ...cat,
-          description_uz: cat.description_uz ?? "",
-          description_ru: cat.description_ru ?? "",
-          description_en: cat.description_en ?? "",
-          icon: cat.icon ?? "",
-        }));
-        setCategories(normalizedData);
-        setTotalCount(data.count);
-      } catch (err) {
-        setError((err as { message?: string }).message || "Kategoriyalarni yuklashda xato yuz berdi");
-      } finally {
-        setLoading(false);
+  const normalizedCategories = useMemo(
+    () =>
+      categories.map((cat) => ({
+        ...cat,
+        description_uz: cat.description_uz ?? "",
+        description_ru: cat.description_ru ?? "",
+        description_en: cat.description_en ?? "",
+        icon: cat.icon ?? "",
+      })),
+    [categories],
+  );
+
+  const sortedCategories = useMemo(() => {
+    return [...normalizedCategories].sort((a, b) => {
+      if (sortField === "is_active") {
+        return sortDirection === "asc"
+          ? Number(a.is_active) - Number(b.is_active)
+          : Number(b.is_active) - Number(a.is_active);
       }
-    };
-
-    fetchCategories();
-  }, [currentPage]);
-
-  const handleSort = (field: keyof Category) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const sortedCategories = [...categories].sort((a, b) => {
-    if (sortField === "is_active") {
-      return sortDirection === "asc"
-        ? Number(a.is_active) - Number(b.is_active)
-        : Number(b.is_active) - Number(a.is_active);
-    }
-    const aField = a[sortField] ?? "";
-    const bField = b[sortField] ?? "";
-    if (aField < bField) return sortDirection === "asc" ? -1 : 1;
-    if (aField > bField) return sortDirection === "asc" ? 1 : -1;
-    return 0;
-  });
+      const aField = a[sortField] ?? "";
+      const bField = b[sortField] ?? "";
+      if (aField < bField) return sortDirection === "asc" ? -1 : 1;
+      if (aField > bField) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [normalizedCategories, sortField, sortDirection]);
 
   const handleAddCategory = async () => {
     try {
-      const createdCategory = await createCategory(newCategory);
-      setCategories([...categories, { 
-        ...createdCategory, 
-        description_uz: createdCategory.description_uz ?? "",
-        description_ru: createdCategory.description_ru ?? "",
-        description_en: createdCategory.description_en ?? "",
-        icon: createdCategory.icon ?? "",
-      }]);
-      setNewCategory({ 
-        name_uz: "", 
-        name_ru: "", 
-        name_en: "", 
-        description_uz: "", 
-        description_ru: "", 
-        description_en: "", 
-        is_active: true, 
-        icon: "" 
+      await createCategory({ ...newCategory, icon: "" });
+      setNewCategory({
+        name_uz: "",
+        name_ru: "",
+        name_en: "",
+        description_uz: "",
+        description_ru: "",
+        description_en: "",
+        is_active: true,
       });
       setAddDialogOpen(false);
-      setCurrentPage(1);
+      if (currentPage !== 1) setCurrentPage(1);
+      else await refetch();
     } catch (err) {
-      setError((err as { message?: string }).message || "Kategoriya qo‘shishda xato yuz berdi");
+      setError(getErrorMessage(err, "Kategoriya qo‘shishda xato yuz berdi"));
     }
   };
 
@@ -177,7 +151,7 @@ export default function CategoryPage() {
       setEditCategory(null);
       setEditDialogOpen(false);
     } catch (err) {
-      setError((err as { message?: string }).message || "Kategoriyani yangilashda xato yuz berdi");
+      setError(getErrorMessage(err, "Kategoriyani yangilashda xato yuz berdi"));
     }
   };
 
@@ -192,7 +166,7 @@ export default function CategoryPage() {
         setCurrentPage(currentPage - 1);
       }
     } catch (err) {
-      setError((err as { message?: string }).message || "Kategoriyani o‘chirishda xato yuz berdi");
+      setError(getErrorMessage(err, "Kategoriyani o‘chirishda xato yuz berdi"));
     }
   };
 
@@ -293,12 +267,7 @@ export default function CategoryPage() {
               <TableBody>
                 {sortedCategories.map((category) => (
                   <TableRow key={category.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <SocialIcon iconName={category.icon} className="h-5 w-5" />
-                        <span>{category.name_uz}</span>
-                      </div>
-                    </TableCell>
+                    <TableCell className="font-medium">{category.name_uz}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
@@ -431,27 +400,6 @@ export default function CategoryPage() {
               value={newCategory.name_en}
               onChange={(e) => setNewCategory({ ...newCategory, name_en: e.target.value })}
             />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="icon">Icon</Label>
-            <Select
-              value={newCategory.icon}
-              onValueChange={(value) => setNewCategory({ ...newCategory, icon: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an icon" />
-              </SelectTrigger>
-              <SelectContent>
-                {socialPlatforms.map((platform) => (
-                  <SelectItem key={platform} value={platform.toLowerCase()}>
-                    <div className="flex items-center gap-2">
-                      <SocialIcon iconName={platform.toLowerCase()} className="h-5 w-5" />
-                      <span>{platform}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="flex items-center gap-2">
             <Label htmlFor="is_active">Active</Label>

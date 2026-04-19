@@ -1,7 +1,7 @@
 // app/(root)/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   BarChart,
   LineChart,
@@ -21,49 +21,12 @@ import { DashboardChart } from "@/components/dashboard/dashboard-chart";
 import { useDateContext } from "@/contexts/date-context";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
-import { getDashboardStatistics } from '@/lib/apiservice'
-// import { getDashboardStatistics } from "@/lib/apiService";
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 
 export default function DashboardPage() {
   const [chartType, setChartType] = useState<"bar" | "line" | "area">("bar");
   const { dateRange, hasDataForRange, getPercentChange, predefinedRange } = useDateContext();
-  const [metrics, setMetrics] = useState({
-    orders: { current: 0, previous: 0 },
-    revenue: { current: 0, previous: 0 },
-    services: { current: 0, previous: 0 },
-    users: { current: 0, previous: 0 },
-  });
-  const [chartData, setChartData] = useState<{ date: string; orders: number; revenue: number }[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const range = predefinedRange === "all" ? undefined : predefinedRange.toUpperCase();
-        const response = await getDashboardStatistics(range);
-
-        setMetrics(response.metrics);
-        setChartData(response.chartData);
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch dashboard data. Please try again later.");
-        setMetrics({
-          orders: { current: 0, previous: 0 },
-          revenue: { current: 0, previous: 0 },
-          services: { current: 0, previous: 0 },
-          users: { current: 0, previous: 0 },
-        });
-        setChartData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [predefinedRange]);
+  const { metrics, chartData, error, isLoading } = useDashboardStats(predefinedRange);
 
   if (isLoading) {
     return <div>Loading...</div>;

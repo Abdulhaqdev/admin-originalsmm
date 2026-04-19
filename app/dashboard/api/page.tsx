@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   Filter,
@@ -11,8 +11,6 @@ import {
   Plus,
   Check,
   X,
-  AlertCircle,
-  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +31,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "@/components/ui/use-toast";
 import {
   getApis,
@@ -45,6 +42,7 @@ import {
   updateExchange,
   deleteExchange,
 } from "@/lib/apiservice";
+import { getApiExchangeLabel, resolveApiExchangeId } from "@/lib/api-admin-helpers";
 
 interface Exchange {
   id: number;
@@ -55,16 +53,12 @@ interface Exchange {
   updated_at: string;
 }
 
-interface ErrorLog {
-  timestamp: string;
-  message: string;
-}
-
 interface Api {
   id: number;
   name: string;
   url: string;
-  exchange: {
+  percentage?: string;
+  exchange?: {
     id: number;
     name: string;
     price: string;
@@ -72,13 +66,11 @@ interface Api {
     updated_at: string;
     is_active: boolean;
   };
-  exchange_id: number;
+  exchange_id?: number;
   created_at: string;
   updated_at: string;
   is_active: boolean;
   key: string;
-  last_used?: string | null;
-  error_logs?: ErrorLog[];
 }
 
 interface PaginatedResponse<T> {
@@ -112,8 +104,6 @@ export default function ApiPage() {
   const [apiFilterActive, setApiFilterActive] = useState<boolean | "all">("all");
   const [apiFilterDialogOpen, setApiFilterDialogOpen] = useState(false);
   const [selectedApis, setSelectedApis] = useState<number[]>([]);
-  const [expandedApiLogs, setExpandedApiLogs] = useState<number[]>([]);
-
   // State for Exchange sorting and filtering
   const [exchangeSortField, setExchangeSortField] = useState<keyof Exchange>("created_at");
   const [exchangeSortDirection, setExchangeSortDirection] = useState<"asc" | "desc">("desc");
@@ -135,9 +125,12 @@ export default function ApiPage() {
   const [exchangeToDelete, setExchangeToDelete] = useState<number | null>(null);
 
   // Form state
-  const [newApi, setNewApi] = useState<Omit<Api, "id" | "created_at" | "updated_at" | "last_used" | "error_logs">>({
+  const [newApi, setNewApi] = useState<
+    Omit<Api, "id" | "created_at" | "updated_at"> & { percentage: string }
+  >({
     name: "",
     url: "",
+    percentage: "0",
     exchange_id: 1,
     is_active: true,
     key: "",
@@ -156,6 +149,7 @@ export default function ApiPage() {
     name?: string;
     key?: string;
     exchange_id?: string;
+    percentage?: string;
   }>({});
 
   const [exchangeFormErrors, setExchangeFormErrors] = useState<{
@@ -204,7 +198,7 @@ export default function ApiPage() {
   };
 
   const filteredApis = apis.filter((api) => {
-    if (apiFilterExchange !== "all" && api.exchange_id !== apiFilterExchange) return false;
+    if (apiFilterExchange !== "all" && resolveApiExchangeId(api) !== apiFilterExchange) return false;
     if (apiFilterActive !== "all" && api.is_active !== apiFilterActive) return false;
     if (
       apiSearchQuery &&
@@ -225,11 +219,11 @@ export default function ApiPage() {
         : Number(bValue) - Number(aValue);
     }
     if (apiSortField === "exchange_id") {
-      const aName = getExchangeName(a.exchange_id);
-      const bName = getExchangeName(b.exchange_id);
+      const aName = getApiExchangeLabel(a, exchanges);
+      const bName = getApiExchangeLabel(b, exchanges);
       return apiSortDirection === "asc" ? aName.localeCompare(bName) : bName.localeCompare(aName);
     }
-    if (apiSortField === "last_used" || apiSortField === "created_at" || apiSortField === "updated_at") {
+    if (apiSortField === "created_at" || apiSortField === "updated_at") {
       const aDate = aValue ? new Date(aValue as string).getTime() : 0;
       const bDate = bValue ? new Date(bValue as string).getTime() : 0;
       return apiSortDirection === "asc" ? aDate - bDate : bDate - aDate;
@@ -298,11 +292,6 @@ export default function ApiPage() {
     );
   };
 
-  // Toggle API logs
-  const toggleApiLogs = (id: number) => {
-    setExpandedApiLogs((prev) => (prev.includes(id) ? prev.filter((apiId) => apiId !== id) : [...prev, id]));
-  };
-
   // Reset API filters
   const resetApiFilters = () => {
     setApiFilterExchange("all");
@@ -317,9 +306,24 @@ export default function ApiPage() {
     if (!data.url) errors.url = "URL is required";
     else if (!/^https?:\/\//.test(data.url)) errors.url = "URL must be valid (start with http:// or https://)";
     if (!data.key) errors.key = "API key is required";
-    if (!data.exchange_id || !exchanges.some((ex) => ex.id === data.exchange_id)) {
+    const resolvedExchangeId =
+      "exchange_id" in data && data.exchange_id !== undefined
+        ? data.exchange_id
+        : "exchange" in data && data.exchange?.id !== undefined
+          ? data.exchange.id
+          : undefined;
+    const exchangeInLoadedList =
+      resolvedExchangeId !== undefined && exchanges.some((ex) => ex.id === resolvedExchangeId);
+    const exchangeMatchesNested =
+      resolvedExchangeId !== undefined &&
+      "exchange" in data &&
+      data.exchange?.id === resolvedExchangeId;
+    if (!resolvedExchangeId || (!exchangeInLoadedList && !exchangeMatchesNested)) {
       errors.exchange_id = "Exchange is required";
     }
+    const pct = "percentage" in data && data.percentage !== undefined ? String(data.percentage).trim() : "";
+    if (!pct) errors.percentage = "Percentage is required";
+    else if (isNaN(parseFloat(pct))) errors.percentage = "Percentage must be a valid number";
     setApiFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -338,11 +342,12 @@ export default function ApiPage() {
   const handleAddApi = async () => {
     if (!validateApiForm(newApi)) return;
     try {
-      const createdApi = await createApi(newApi);
+      const createdApi = await createApi(newApi as Parameters<typeof createApi>[0]);
       setApis((prev) => [...prev, createdApi]);
       setNewApi({
         name: "",
         url: "",
+        percentage: "0",
         exchange_id: exchanges[0]?.id || 1,
         is_active: true,
         key: "",
@@ -356,6 +361,11 @@ export default function ApiPage() {
           ...prev,
           exchange_id: err.response.data.exchange_id[0] || "Exchange is required",
         }));
+      } else if (err?.response?.data?.percentage) {
+        setApiFormErrors((prev) => ({
+          ...prev,
+          percentage: err.response.data.percentage[0] || "Percentage is required",
+        }));
       } else {
         setError((err as { message?: string }).message || "API qo‘shishda xato yuz berdi");
       }
@@ -365,7 +375,11 @@ export default function ApiPage() {
   const handleUpdateApi = async () => {
     if (!editingApi || !validateApiForm(editingApi)) return;
     try {
-      const updatedApi = await updateApi(editingApi.id, editingApi);
+      const exchangeId = editingApi.exchange_id ?? editingApi.exchange?.id;
+      const updatedApi = await updateApi(editingApi.id, {
+        ...editingApi,
+        ...(exchangeId !== undefined ? { exchange_id: exchangeId } : {}),
+      });
       setApis((prev) => prev.map((api) => (api.id === updatedApi.id ? updatedApi : api)));
       setEditingApi(null);
       setApiFormOpen(false);
@@ -375,6 +389,11 @@ export default function ApiPage() {
         setApiFormErrors((prev) => ({
           ...prev,
           exchange_id: err.response.data.exchange_id[0] || "Exchange is required",
+        }));
+      } else if (err?.response?.data?.percentage) {
+        setApiFormErrors((prev) => ({
+          ...prev,
+          percentage: err.response.data.percentage[0] || "Percentage is required",
         }));
       } else {
         setError((err as { message?: string }).message || "API yangilashda xato yuz berdi");
@@ -425,7 +444,7 @@ export default function ApiPage() {
   const handleDeleteExchange = async () => {
     if (exchangeToDelete === null) return;
     try {
-      const apisUsingExchange = apis.some((api) => api.exchange_id === exchangeToDelete);
+      const apisUsingExchange = apis.some((api) => resolveApiExchangeId(api) === exchangeToDelete);
       if (apisUsingExchange) {
         toast({
           variant: "destructive",
@@ -479,10 +498,6 @@ export default function ApiPage() {
     } catch (err) {
       setError((err as { message?: string }).message || "Bulk actionda xato yuz berdi");
     }
-  };
-
-  const getExchangeName = (id: number) => {
-    return exchanges.find((exchange) => exchange.id === id)?.name || "Unknown";
   };
 
   const totalApiPages = Math.ceil(totalApiCount / itemsPerPage);
@@ -645,109 +660,62 @@ export default function ApiPage() {
                             (apiSortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
                         </div>
                       </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => handleApiSort("last_used")}>
-                        <div className="flex items-center gap-1">
-                          Last Used
-                          {apiSortField === "last_used" &&
-                            (apiSortDirection === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
-                        </div>
-                      </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedApis.map((api) => (
-                      <React.Fragment key={api.id}>
-                        <TableRow>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedApis.includes(api.id)}
-                              onCheckedChange={() => handleSelectApi(api.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{api.name}</TableCell>
-                          <TableCell>{api.url}</TableCell>
-                          <TableCell>{getExchangeName(api.exchange_id)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              {api.is_active ? (
-                                <Check className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <X className="h-4 w-4 text-red-500" />
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {api.last_used ? (
-                              new Date(api.last_used).toLocaleString()
+                      <TableRow key={api.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedApis.includes(api.id)}
+                            onCheckedChange={() => handleSelectApi(api.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{api.name}</TableCell>
+                        <TableCell>{api.url}</TableCell>
+                        <TableCell>{getApiExchangeLabel(api, exchanges)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            {api.is_active ? (
+                              <Check className="h-4 w-4 text-green-500" />
                             ) : (
-                              <span className="text-muted-foreground">Never</span>
+                              <X className="h-4 w-4 text-red-500" />
                             )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => toggleApiLogs(api.id)}
-                                title="View Logs"
-                              >
-                                <Clock className="h-4 w-4" />
-                                <span className="sr-only">View Logs</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setEditingApi(api);
-                                  setApiFormErrors({});
-                                  setApiFormOpen(true);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                                <span className="sr-only">Edit</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setApiToDelete(api.id);
-                                  setDeleteApiDialogOpen(true);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Delete</span>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {expandedApiLogs.includes(api.id) && (
-                          <TableRow>
-                            <TableCell colSpan={7} className="bg-muted/30">
-                              <div className="p-2">
-                                <h4 className="font-medium mb-2">API Usage Logs</h4>
-                                {api.error_logs && api.error_logs.length > 0 ? (
-                                  <div className="space-y-2">
-                                    {api.error_logs.map((log, index) => (
-                                      <Alert key={index} variant="destructive">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertTitle>Error at {new Date(log.timestamp).toLocaleString()}</AlertTitle>
-                                        <AlertDescription>{log.message}</AlertDescription>
-                                      </Alert>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-muted-foreground">No error logs available.</p>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingApi(api);
+                                setApiFormErrors({});
+                                setApiFormOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setApiToDelete(api.id);
+                                setDeleteApiDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
                     {sortedApis.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No APIs found. Try adjusting your filters or add a new API.
                         </TableCell>
                       </TableRow>
@@ -1104,7 +1072,9 @@ export default function ApiPage() {
             </Label>
             <Select
               required
-              value={String(editingApi ? editingApi.exchange_id : newApi.exchange_id ?? "")}
+              value={String(
+                editingApi ? editingApi.exchange_id ?? editingApi.exchange?.id ?? "" : newApi.exchange_id ?? "",
+              )}
               onValueChange={(value) =>
                 editingApi
                   ? setEditingApi({ ...editingApi, exchange_id: Number(value) })
@@ -1142,6 +1112,25 @@ export default function ApiPage() {
               placeholder="Enter API key"
             />
             {apiFormErrors.key && <p className="text-sm text-destructive">{apiFormErrors.key}</p>}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="percentage">
+              Percentage<span className="text-destructive ml-1">*</span>
+            </Label>
+            <Input
+              id="percentage"
+              inputMode="decimal"
+              value={editingApi ? (editingApi.percentage ?? "") : newApi.percentage}
+              onChange={(e) =>
+                editingApi
+                  ? setEditingApi({ ...editingApi, percentage: e.target.value })
+                  : setNewApi({ ...newApi, percentage: e.target.value })
+              }
+              placeholder="e.g. 10"
+            />
+            {apiFormErrors.percentage && (
+              <p className="text-sm text-destructive">{apiFormErrors.percentage}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Label htmlFor="is_active">Active</Label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Download, Search, Filter, FileText, FileSpreadsheet, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { useToast } from "@/hooks/use-toast";
+import { usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { getPayments } from "@/lib/apiservice";
 
 interface User {
@@ -65,45 +65,28 @@ interface PaginatedResponse<T> {
 }
 
 export default function PaymentPage() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const {
+    data: payments,
+    totalCount,
+    loading: isLoading,
+    error,
+    page: currentPage,
+    setPage: setCurrentPage,
+    itemsPerPage,
+  } = usePaginatedQuery(
+    (limit, offset) => getPayments(limit, offset, "admin"),
+    "Failed to fetch payments",
+    10,
+  );
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+
   const [sortField, setSortField] = useState<keyof Payment | "payment_type.name">("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchPayments = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await getPayments(itemsPerPage, (currentPage - 1) * itemsPerPage, "admin");
-        setPayments(response.results);
-        setTotalPages(Math.ceil(response.count / itemsPerPage));
-      } catch (err) {
-        const errorMessage = (err as { message?: string }).message || "Failed to fetch payments";
-        setError(errorMessage);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPayments();
-  }, [currentPage]);
 
   const handleSort = (field: keyof Payment | "payment_type.name") => {
     if (sortField === field) {
@@ -114,34 +97,36 @@ export default function PaymentPage() {
     }
   };
 
-  // Apply filters
-  const filteredPayments = payments.filter((payment) => {
-    if (
-      searchQuery &&
-      !payment.id.toString().includes(searchQuery) &&
-      !payment.price.includes(searchQuery) &&
-      !payment.payment_type.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.user.username.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
-      return false;
-    }
-    return true;
-  });
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => {
+      if (
+        searchQuery &&
+        !payment.id.toString().includes(searchQuery) &&
+        !payment.price.includes(searchQuery) &&
+        !payment.payment_type.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !payment.user.username.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [payments, searchQuery]);
 
-  const sortedPayments = [...filteredPayments].sort((a, b) => {
-    let aValue: any = sortField === "payment_type.name" ? a.payment_type.name : a[sortField];
-    let bValue: any = sortField === "payment_type.name" ? b.payment_type.name : b[sortField];
+  const sortedPayments = useMemo(() => {
+    return [...filteredPayments].sort((a, b) => {
+      let aValue: string | number = sortField === "payment_type.name" ? a.payment_type.name : (a[sortField] as string | number);
+      let bValue: string | number = sortField === "payment_type.name" ? b.payment_type.name : (b[sortField] as string | number);
 
-    // Handle string vs number for price
-    if (sortField === "price") {
-      aValue = parseFloat(aValue);
-      bValue = parseFloat(bValue);
-    }
+      if (sortField === "price") {
+        aValue = parseFloat(String(aValue));
+        bValue = parseFloat(String(bValue));
+      }
 
-    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-    return 0;
-  });
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredPayments, sortField, sortDirection]);
 
 
 
