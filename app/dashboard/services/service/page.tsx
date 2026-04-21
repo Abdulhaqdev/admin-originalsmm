@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Plus, Filter, Search } from "lucide-react";
@@ -200,10 +201,15 @@ export default function ServicePage() {
           <h1 className="text-3xl font-bold">Services</h1>
           <p className="text-muted-foreground">Manage your services and their details.</p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Service
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/dashboard/multiservice">Create Multi Service</Link>
+          </Button>
+          <Button onClick={() => setAddDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Service
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
