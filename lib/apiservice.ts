@@ -13,13 +13,15 @@ interface RefreshTokenResponse {
   access: string;
 }
 
+const FALLBACK_API_BASE_URL = "https://api.orginal-smm.com/api";
 const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+const API_BASE_URL = (rawApiBaseUrl || FALLBACK_API_BASE_URL).replace(/\/+$/, "");
 
 if (!rawApiBaseUrl) {
-  throw new Error("NEXT_PUBLIC_API_BASE_URL is missing. Configure it in environment variables before building the app.");
+  console.error(
+    `NEXT_PUBLIC_API_BASE_URL is missing. Falling back to ${FALLBACK_API_BASE_URL}. Check deployment env config.`,
+  );
 }
-
-const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, "");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -50,6 +52,11 @@ const getCookie = (name: string): string | null => {
 
 apiClient.interceptors.request.use(
   (config) => {
+    // Prevent relative requests from accidentally hitting the frontend domain.
+    if (!config.baseURL) {
+      config.baseURL = API_BASE_URL;
+    }
+
     const token = localStorage.getItem("access_token");
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
