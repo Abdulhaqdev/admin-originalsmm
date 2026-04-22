@@ -13,7 +13,13 @@ interface RefreshTokenResponse {
   access: string;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+
+if (!rawApiBaseUrl) {
+  throw new Error("NEXT_PUBLIC_API_BASE_URL is missing. Configure it in environment variables before building the app.");
+}
+
+const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, "");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
