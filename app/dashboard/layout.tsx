@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { cn } from "@/lib/utils"
 import { DateProvider } from "@/contexts/date-context"
+import { Toaster } from "@/components/ui/toaster"
 
 export default function DashboardLayout({
   children,
@@ -38,12 +39,15 @@ export default function DashboardLayout({
 
   return (
     <DateProvider>
-      <div className="flex min-h-screen bg-background">
-        <Sidebar />
-        <main className={cn("flex-1 transition-all duration-300 min-h-screen", isCollapsed ? "ml-16" : "ml-64")}>
-          <div className="container mx-auto py-6 px-6 md:px-8 max-w-full">{children}</div>
-        </main>
-      </div>
+      <>
+        <div className="flex min-h-screen bg-background">
+          <Sidebar />
+          <main className={cn("flex-1 transition-all duration-300 min-h-screen", isCollapsed ? "ml-16" : "ml-64")}>
+            <div className="container mx-auto py-6 px-6 md:px-8 max-w-full">{children}</div>
+          </main>
+        </div>
+        <Toaster />
+      </>
     </DateProvider>
   )
 }

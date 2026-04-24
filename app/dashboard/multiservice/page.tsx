@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Languages, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { FormMessage } from "@/components/ui/form";
 import { DurationInput } from "@/components/ui/duration-input";
-import { apiClient, getApis, getCategories } from "@/lib/apiservice";
+import { toast } from "@/hooks/use-toast";
+import { apiClient, getApis, getCategories, translateText } from "@/lib/apiservice";
 import { getErrorMessage } from "@/lib/error-utils";
 import { Api, Category } from "@/types";
 
@@ -56,7 +57,13 @@ export default function MultiServiceCreatePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [fetchLoading, setFetchLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [translatingNameIndex, setTranslatingNameIndex] = useState<number | null>(null);
+  const [translatingDescriptionIndex, setTranslatingDescriptionIndex] = useState<number | null>(null);
+
+  const getCategoryLabel = (category: Category) => {
+    const names = [category.name_uz, category.name_ru, category.name_en].filter(Boolean);
+    return names.length > 0 ? names.join(" / ") : `Category ${category.id}`;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -77,7 +84,11 @@ export default function MultiServiceCreatePage() {
         setCategories(normalizedCategories);
         setApis(apisData.results);
       } catch (err) {
-        setError(getErrorMessage(err, "Ma'lumotlarni yuklashda xato yuz berdi"));
+        toast({
+          title: "Xatolik",
+          description: getErrorMessage(err, "Ma'lumotlarni yuklashda xato yuz berdi"),
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -99,7 +110,11 @@ export default function MultiServiceCreatePage() {
         setServices([]); // Clear existing forms when new services are fetched
         setFormErrors({});
       } catch (err) {
-        setError(getErrorMessage(err, "Xizmatlarni yuklashda xato yuz berdi"));
+        toast({
+          title: "Xatolik",
+          description: getErrorMessage(err, "Xizmatlarni yuklashda xato yuz berdi"),
+          variant: "destructive",
+        });
       } finally {
         setFetchLoading(false);
       }
@@ -121,7 +136,7 @@ export default function MultiServiceCreatePage() {
           min: service.min || 10,
           max: service.max || 1000,
           price: service.price ? service.price / 1000 : 0.65, // Convert to dollars
-          percent: service.percent.toString() || "0",
+          percent: String(service.percent ?? 0),
           site_id: service.site_id || 0,
           api: Number(selectedApi),
           is_active: true,
@@ -203,15 +218,27 @@ export default function MultiServiceCreatePage() {
       if (!validateForm(index)) isValid = false;
     });
     if (!selectedCategory) {
-      alert("Please select a category");
+      toast({
+        title: "Xatolik",
+        description: "Please select a category",
+        variant: "destructive",
+      });
       return;
     }
     if (!selectedApi) {
-      alert("Please select an API");
+      toast({
+        title: "Xatolik",
+        description: "Please select an API",
+        variant: "destructive",
+      });
       return;
     }
     if (!isValid) {
-      alert("Please fix the errors in the forms");
+      toast({
+        title: "Xatolik",
+        description: "Please fix the errors in the forms",
+        variant: "destructive",
+      });
       return;
     }
     try {
@@ -224,14 +251,117 @@ export default function MultiServiceCreatePage() {
         })),
       };
       await apiClient.post("/create-many-services/", payload);
-      alert("All services created successfully!");
+      toast({
+        title: "Muvaffaqiyatli",
+        description: "All services created successfully!",
+      });
       setServices([]);
       setFormErrors({});
       setSelectedServiceId("");
     } catch (err) {
-      setError(getErrorMessage(err, "Xizmatlarni yaratishda xato yuz berdi"));
+      toast({
+        title: "Xatolik",
+        description: getErrorMessage(err, "Xizmatlarni yaratishda xato yuz berdi"),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTranslateName = async (index: number) => {
+    const service = services[index];
+    if (!service?.name_en) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [index]: {
+          ...(prev[index] || {}),
+          name_en: "Name (English) is required for translation",
+        },
+      }));
+      return;
+    }
+
+    try {
+      setTranslatingNameIndex(index);
+      const translated = await translateText(service.name_en);
+      setServices((prev) =>
+        prev.map((item, i) =>
+          i === index
+            ? {
+                ...item,
+                name_en: translated.text || item.name_en,
+                name_ru: translated.text_ru || item.name_ru,
+                name_uz: translated.text_uz || item.name_uz,
+              }
+            : item,
+        ),
+      );
+      setFormErrors((prev) => {
+        const current = prev[index];
+        if (!current) return prev;
+        const { name_en, name_ru, name_uz, ...rest } = current;
+        return {
+          ...prev,
+          [index]: rest,
+        };
+      });
+    } catch (err) {
+      toast({
+        title: "Xatolik",
+        description: getErrorMessage(err, "Nomni tarjima qilishda xato yuz berdi"),
+        variant: "destructive",
+      });
+    } finally {
+      setTranslatingNameIndex(null);
+    }
+  };
+
+  const handleTranslateDescription = async (index: number) => {
+    const service = services[index];
+    if (!service?.description_en) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [index]: {
+          ...(prev[index] || {}),
+          description_en: "Description (English) is required for translation",
+        },
+      }));
+      return;
+    }
+
+    try {
+      setTranslatingDescriptionIndex(index);
+      const translated = await translateText(service.description_en);
+      setServices((prev) =>
+        prev.map((item, i) =>
+          i === index
+            ? {
+                ...item,
+                description_en: translated.text || item.description_en,
+                description_ru: translated.text_ru || item.description_ru,
+                description_uz: translated.text_uz || item.description_uz,
+              }
+            : item,
+        ),
+      );
+      setFormErrors((prev) => {
+        const current = prev[index];
+        if (!current) return prev;
+        const { description_en, description_ru, description_uz, ...rest } = current;
+        return {
+          ...prev,
+          [index]: rest,
+        };
+      });
+    } catch (err) {
+      toast({
+        title: "Xatolik",
+        description: getErrorMessage(err, "Tavsifni tarjima qilishda xato yuz berdi"),
+        variant: "destructive",
+      });
+    } finally {
+      setTranslatingDescriptionIndex(null);
     }
   };
 
@@ -245,10 +375,6 @@ export default function MultiServiceCreatePage() {
         </main>
       </div>
     );
-  }
-
-  if (error) {
-    return <div className="text-red-500 text-center">{error}</div>;
   }
 
   return (
@@ -281,7 +407,7 @@ export default function MultiServiceCreatePage() {
                       <SelectContent>
                         {categories.map((category) => (
                           <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name_en}
+                            {getCategoryLabel(category)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -397,6 +523,17 @@ export default function MultiServiceCreatePage() {
                                 {formErrors[index]?.name_en && <FormMessage>{formErrors[index].name_en}</FormMessage>}
                               </div>
 
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => void handleTranslateName(index)}
+                                disabled={translatingNameIndex === index || !service.name_en}
+                                className="w-fit"
+                              >
+                                <Languages className="mr-2 h-4 w-4" />
+                                {translatingNameIndex === index ? "Translating..." : "Translate Name"}
+                              </Button>
+
                               <DurationInput
                                 value={service.duration}
                                 onChange={(duration) => updateServiceForm(index, "duration", duration)}
@@ -443,6 +580,17 @@ export default function MultiServiceCreatePage() {
                                 />
                                 {formErrors[index]?.description_en && <FormMessage>{formErrors[index].description_en}</FormMessage>}
                               </div>
+
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => void handleTranslateDescription(index)}
+                                disabled={translatingDescriptionIndex === index || !service.description_en}
+                                className="w-fit"
+                              >
+                                <Languages className="mr-2 h-4 w-4" />
+                                {translatingDescriptionIndex === index ? "Translating..." : "Translate Description"}
+                              </Button>
 
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
