@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/pagination";
 import { usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { getPayments } from "@/lib/apiservice";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PaymentTypesManager } from "@/components/payment/PaymentTypesManager";
+import { HeleketSetupCard } from "@/components/payment/HeleketSetupCard";
 
 interface User {
   id: number;
@@ -164,9 +167,16 @@ export default function PaymentPage() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
-        
       </div>
 
+      <Tabs defaultValue="transactions">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <TabsTrigger value="transactions">Tranzaksiyalar</TabsTrigger>
+          <TabsTrigger value="types">To'lov turlari</TabsTrigger>
+          <TabsTrigger value="heleket">Heleket</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions" className="space-y-6 mt-6">
       <Card>
         <CardHeader>
           <CardTitle>Manage Payments</CardTitle>
@@ -453,6 +463,16 @@ export default function PaymentPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="types" className="mt-6">
+          <PaymentTypesManager />
+        </TabsContent>
+
+        <TabsContent value="heleket" className="mt-6">
+          <HeleketSetupCard />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -251,9 +251,11 @@ export const deleteService = async (id: number): Promise<void> => {
 };
 
 // -------------------- PAYMENT RELATED -------------------- //
-interface PaymentType {
+export interface PaymentType {
   id: number;
   name: string;
+  api_url: string;
+  api_key: string;
   created_at: string;
   updated_at: string;
   is_active: boolean;
@@ -279,6 +281,47 @@ export const getPayments = async (
       params: { limit, offset, type },
     });
     return response.data;
+  } catch (error) {
+    return handleError(error as AxiosError<ErrorResponse>);
+  }
+};
+
+export const getPaymentTypes = async (): Promise<PaymentType[]> => {
+  try {
+    const response = await apiClient.get<PaymentType[] | PaginatedResponse<PaymentType>>("/payment-types/");
+    const data = response.data;
+    return Array.isArray(data) ? data : data.results;
+  } catch (error) {
+    return handleError(error as AxiosError<ErrorResponse>);
+  }
+};
+
+export const createPaymentType = async (
+  paymentType: Omit<PaymentType, "id" | "created_at" | "updated_at">,
+): Promise<PaymentType> => {
+  try {
+    const response = await apiClient.post<PaymentType>("/payment-types/", paymentType);
+    return response.data;
+  } catch (error) {
+    return handleError(error as AxiosError<ErrorResponse>);
+  }
+};
+
+export const updatePaymentType = async (
+  id: number,
+  paymentType: Partial<Omit<PaymentType, "id" | "created_at" | "updated_at">>,
+): Promise<PaymentType> => {
+  try {
+    const response = await apiClient.put<PaymentType>(`/payment-types/${id}/`, paymentType);
+    return response.data;
+  } catch (error) {
+    return handleError(error as AxiosError<ErrorResponse>);
+  }
+};
+
+export const deletePaymentType = async (id: number): Promise<void> => {
+  try {
+    await apiClient.delete(`/payment-types/${id}/`);
   } catch (error) {
     return handleError(error as AxiosError<ErrorResponse>);
   }
